@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "416648406702",
+    "project_id": "advocura-95e89",
+    "storage_bucket": "advocura-95e89.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:416648406702:android:eeb1696749f0748344ef3f",
+        "android_client_info": {
+          "package_name": "com.mk.ac"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCZILeIOJOA0z-GwI53Fz731JV_y6YutTk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
