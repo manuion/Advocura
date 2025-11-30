@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ActionSheetIOS, Platform, PermissionsAndroid, Linking, NativeModules } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ActionSheetIOS, Platform, PermissionsAndroid, Linking, NativeModules, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getCaseById, deleteCase } from '../../services/casesService';
 import { getCurrentUser } from '../../services/authService';
@@ -29,6 +29,11 @@ const CaseDetailsScreen = ({ navigation, route }) => {
     const [uploading, setUploading] = useState(false);
     const [multiSelectMode, setMultiSelectMode] = useState(false);
     const [selectedDocuments, setSelectedDocuments] = useState([]);
+
+    // Rename modal state (for Android)
+    const [showRenameModal, setShowRenameModal] = useState(false);
+    const [renameFileName, setRenameFileName] = useState('');
+    const [renameCallback, setRenameCallback] = useState(null);
 
     useEffect(() => {
         loadCase();
@@ -280,86 +285,147 @@ const CaseDetailsScreen = ({ navigation, route }) => {
 
             // Generate a unique document ID for this scan session
             const scanId = Date.now();
-            const pdfFileName = `scan_${scanId}.pdf`;
+            const defaultPdfName = `scan_${scanId}.pdf`;
 
-            setUploading(true);
+            // Prompt for PDF name before creating
+            promptForFileName(defaultPdfName, async (pdfFileName) => {
+                setUploading(true);
 
-            try {
-                // Create PDF from scanned images
-                const pdfPath = `${RNFS.DocumentDirectoryPath}/${pdfFileName}`;
+                try {
+                    // Create PDF from scanned images
+                    const pdfPath = `${RNFS.DocumentDirectoryPath}/${pdfFileName}`;
 
-                console.log('Creating PDF from scanned pages...');
+                    console.log('Creating PDF from scanned pages...');
 
-                // Create a new PDF document (A4 size: 210mm x 297mm)
-                const doc = new jsPDF({
-                    orientation: 'portrait',
-                    unit: 'mm',
-                    format: 'a4'
-                });
+                    // Create a new PDF document (A4 size: 210mm x 297mm)
+                    const doc = new jsPDF({
+                        orientation: 'portrait',
+                        unit: 'mm',
+                        format: 'a4'
+                    });
 
-                // Add each scanned image as a page in the PDF
-                for (let i = 0; i < scannedImages.length; i++) {
-                    let imageUri = scannedImages[i];
-                    if (imageUri.startsWith('file://')) {
-                        imageUri = imageUri.replace('file://', '');
+                    // Add each scanned image as a page in the PDF
+                    for (let i = 0; i < scannedImages.length; i++) {
+                        let imageUri = scannedImages[i];
+                        if (imageUri.startsWith('file://')) {
+                            imageUri = imageUri.replace('file://', '');
+                        }
+
+                        console.log(`Adding page ${i + 1}/${scannedImages.length} to PDF`);
+
+                        // Read image as base64
+                        const imageBase64 = await RNFS.readFile(imageUri, 'base64');
+
+                        // Add new page if not the first image
+                        if (i > 0) {
+                            doc.addPage();
+                        }
+
+                        // Add image to PDF (fit to A4 page)
+                        const imageData = `data:image/jpeg;base64,${imageBase64}`;
+                        doc.addImage(imageData, 'JPEG', 0, 0, 210, 297);
                     }
 
-                    console.log(`Adding page ${i + 1}/${scannedImages.length} to PDF`);
+                    // Get PDF as base64 string
+                    const pdfBase64 = doc.output('datauristring').split(',')[1];
 
-                    // Read image as base64
-                    const imageBase64 = await RNFS.readFile(imageUri, 'base64');
+                    // Write PDF to file system
+                    await RNFS.writeFile(pdfPath, pdfBase64, 'base64');
+                    console.log('PDF created successfully');
 
-                    // Add new page if not the first image
-                    if (i > 0) {
-                        doc.addPage();
-                    }
+                    // Get PDF file stats
+                    const pdfStats = await RNFS.stat(pdfPath);
 
-                    // Add image to PDF (fit to A4 page)
-                    const imageData = `data:image/jpeg;base64,${imageBase64}`;
-                    doc.addImage(imageData, 'JPEG', 0, 0, 210, 297);
+                    // Upload the PDF
+                    console.log(`Uploading PDF: ${pdfFileName} (${pdfStats.size} bytes)`);
+
+                    await uploadFile({
+                        uri: `file://${pdfPath}`,
+                        type: 'application/pdf',
+                        name: pdfFileName,
+                        size: pdfStats.size,
+                    });
+
+                    console.log('PDF uploaded successfully');
+
+                    // Clean up the temporary PDF file
+                    await RNFS.unlink(pdfPath);
+
+                    Alert.alert(
+                        'Success',
+                        `${scannedImages.length} page(s) scanned and combined into PDF`
+                    );
+                } catch (error) {
+                    console.error('PDF creation/upload error:', error);
+                    Alert.alert('Error', 'Failed to create or upload PDF: ' + error.message);
+                } finally {
+                    setUploading(false);
                 }
-
-                // Get PDF as base64 string
-                const pdfBase64 = doc.output('datauristring').split(',')[1];
-
-                // Write PDF to file system
-                await RNFS.writeFile(pdfPath, pdfBase64, 'base64');
-                console.log('PDF created successfully');
-
-                // Get PDF file stats
-                const pdfStats = await RNFS.stat(pdfPath);
-
-                // Upload the PDF
-                console.log(`Uploading PDF: ${pdfFileName} (${pdfStats.size} bytes)`);
-
-                await uploadFile({
-                    uri: `file://${pdfPath}`,
-                    type: 'application/pdf',
-                    name: pdfFileName,
-                    size: pdfStats.size,
-                });
-
-                console.log('PDF uploaded successfully');
-
-                // Clean up the temporary PDF file
-                await RNFS.unlink(pdfPath);
-
-                Alert.alert(
-                    'Success',
-                    `${scannedImages.length} page(s) scanned and combined into PDF`
-                );
-            } catch (error) {
-                console.error('PDF creation/upload error:', error);
-                Alert.alert('Error', 'Failed to create or upload PDF: ' + error.message);
-            } finally {
-                setUploading(false);
-            }
+            });
         } catch (error) {
             console.error('Document scan error:', error);
             setUploading(false);
             if (error.message !== 'User canceled') {
                 Alert.alert('Error', 'Failed to scan document: ' + error.message);
             }
+        }
+    };
+
+    const promptForFileName = (originalName, callback) => {
+        // Extract extension
+        const lastDot = originalName.lastIndexOf('.');
+        const nameWithoutExt = lastDot > 0 ? originalName.substring(0, lastDot) : originalName;
+        const extension = lastDot > 0 ? originalName.substring(lastDot) : '';
+
+        if (Platform.OS === 'ios') {
+            Alert.prompt(
+                'Name this file',
+                'Enter a name for this file (leave empty to keep original)',
+                [
+                    {
+                        text: 'Cancel',
+                        style: 'cancel',
+                        onPress: () => callback(originalName)
+                    },
+                    {
+                        text: 'Save',
+                        onPress: (newName) => {
+                            if (newName && newName.trim()) {
+                                callback(newName.trim() + extension);
+                            } else {
+                                callback(originalName);
+                            }
+                        }
+                    }
+                ],
+                'plain-text',
+                nameWithoutExt
+            );
+        } else {
+            // Android - use custom modal
+            setRenameFileName(nameWithoutExt);
+            setRenameCallback(() => (newName) => {
+                if (newName && newName.trim()) {
+                    callback(newName.trim() + extension);
+                } else {
+                    callback(originalName);
+                }
+            });
+            setShowRenameModal(true);
+        }
+    };
+
+    const handleRenameSave = () => {
+        setShowRenameModal(false);
+        if (renameCallback) {
+            renameCallback(renameFileName);
+        }
+    };
+
+    const handleRenameCancel = () => {
+        setShowRenameModal(false);
+        if (renameCallback) {
+            renameCallback(''); // Empty will use original name
         }
     };
 
@@ -386,11 +452,16 @@ const CaseDetailsScreen = ({ navigation, route }) => {
         }
 
         const photo = result.assets[0];
-        await uploadFile({
-            uri: photo.uri,
-            type: photo.type,
-            name: photo.fileName || `image_${Date.now()}.jpg`,
-            size: photo.fileSize,
+        const originalName = photo.fileName || `image_${Date.now()}.jpg`;
+
+        // Prompt for file name
+        promptForFileName(originalName, (finalName) => {
+            uploadFile({
+                uri: photo.uri,
+                type: photo.type,
+                name: finalName,
+                size: photo.fileSize,
+            });
         });
     };
 
@@ -411,7 +482,12 @@ const CaseDetailsScreen = ({ navigation, route }) => {
             });
 
             const file = res[0];
-            await uploadFile(file);
+            const originalName = file.name;
+
+            // Prompt for file name
+            promptForFileName(originalName, (finalName) => {
+                uploadFile({ ...file, name: finalName });
+            });
         } catch (err) {
             if (DocumentPicker.isCancel(err)) {
                 // User cancelled the picker, ignore
@@ -646,6 +722,49 @@ const CaseDetailsScreen = ({ navigation, route }) => {
         const sizes = ['Bytes', 'KB', 'MB', 'GB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    };
+
+    const getDocumentIcon = (doc) => {
+        const fileName = doc.name?.toLowerCase() || '';
+        const fileType = doc.type?.toLowerCase() || '';
+
+        // PDF
+        if (fileType === 'application/pdf' || fileName.endsWith('.pdf')) {
+            return '📕';
+        }
+
+        // Images
+        if (fileType.startsWith('image/') || fileName.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)) {
+            return '🖼️';
+        }
+
+        // Word documents
+        if (fileType.includes('word') || fileName.match(/\.(doc|docx)$/i)) {
+            return '📘';
+        }
+
+        // Excel spreadsheets
+        if (fileType.includes('sheet') || fileType.includes('excel') || fileName.match(/\.(xls|xlsx|csv)$/i)) {
+            return '📊';
+        }
+
+        // PowerPoint presentations
+        if (fileType.includes('presentation') || fileType.includes('powerpoint') || fileName.match(/\.(ppt|pptx)$/i)) {
+            return '📙';
+        }
+
+        // Text files
+        if (fileType === 'text/plain' || fileName.endsWith('.txt')) {
+            return '📝';
+        }
+
+        // Compressed files
+        if (fileName.match(/\.(zip|rar|7z|tar|gz)$/i)) {
+            return '📦';
+        }
+
+        // Default for unknown types
+        return '📄';
     };
 
     if (loading) {
@@ -903,7 +1022,7 @@ const CaseDetailsScreen = ({ navigation, route }) => {
                                             </View>
                                         )}
                                         <View style={styles.documentIcon}>
-                                            <Text style={styles.documentIconText}>📄</Text>
+                                            <Text style={styles.documentIconText}>{getDocumentIcon(doc)}</Text>
                                         </View>
                                         <View style={styles.documentInfo}>
                                             <Text style={styles.documentName} numberOfLines={1}>{doc.name}</Text>
@@ -944,6 +1063,44 @@ const CaseDetailsScreen = ({ navigation, route }) => {
 
                 <View style={{ height: 40 }} />
             </ScrollView>
+
+            {/* Rename Modal for Android */}
+            <Modal
+                visible={showRenameModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={handleRenameCancel}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Name this file</Text>
+                        <Text style={styles.modalSubtitle}>Enter a name (leave empty to keep original)</Text>
+                        <TextInput
+                            style={styles.modalInput}
+                            value={renameFileName}
+                            onChangeText={setRenameFileName}
+                            placeholder="File name"
+                            placeholderTextColor="#666"
+                            autoFocus={true}
+                            selectTextOnFocus={true}
+                        />
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.modalCancelButton]}
+                                onPress={handleRenameCancel}
+                            >
+                                <Text style={styles.modalCancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.modalSaveButton]}
+                                onPress={handleRenameSave}
+                            >
+                                <Text style={styles.modalSaveText}>Save</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -1204,21 +1361,17 @@ const styles = StyleSheet.create({
     documentCard: {
         flexDirection: 'row',
         backgroundColor: '#1E1E1E',
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 12,
+        borderRadius: 10,
+        padding: 12,
+        marginBottom: 8,
         borderWidth: 1,
         borderColor: '#333',
         alignItems: 'center',
     },
     documentIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 8,
-        backgroundColor: '#2A2A2A',
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 12,
+        marginRight: 8,
     },
     documentIconText: {
         fontSize: 20,
@@ -1326,6 +1479,70 @@ const styles = StyleSheet.create({
     checkboxText: {
         color: '#CD7F32',
         fontSize: 18,
+        fontWeight: 'bold',
+    },
+    // Rename modal styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    modalContent: {
+        backgroundColor: '#1E1E1E',
+        borderRadius: 16,
+        padding: 24,
+        width: '100%',
+        maxWidth: 400,
+        borderWidth: 1,
+        borderColor: '#333',
+    },
+    modalTitle: {
+        color: '#FFFFFF',
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginBottom: 8,
+    },
+    modalSubtitle: {
+        color: '#999',
+        fontSize: 14,
+        marginBottom: 20,
+    },
+    modalInput: {
+        backgroundColor: '#2A2A2A',
+        borderRadius: 8,
+        padding: 12,
+        color: '#FFFFFF',
+        fontSize: 16,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#CD7F32',
+    },
+    modalButtons: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    modalButton: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    modalCancelButton: {
+        backgroundColor: '#333',
+    },
+    modalSaveButton: {
+        backgroundColor: '#CD7F32',
+    },
+    modalCancelText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    modalSaveText: {
+        color: '#121212',
+        fontSize: 16,
         fontWeight: 'bold',
     },
 });
