@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import Toast from 'react-native-toast-message';
 import { firebaseAuth } from '../../services/firebase';
 
 const SignupScreen = ({ navigation }: any) => {
@@ -9,7 +10,7 @@ const SignupScreen = ({ navigation }: any) => {
 
     const handleSignup = async () => {
         if (!email || !password) {
-            Alert.alert('Error', 'Please enter email and password');
+            Toast.show({ type: 'error', text1: 'Error', text2: 'Please enter email and password' });
             return;
         }
         setLoading(true);
@@ -17,7 +18,7 @@ const SignupScreen = ({ navigation }: any) => {
             await firebaseAuth.createUserWithEmailAndPassword(email, password);
             // Auth state listener in AppNavigator will handle navigation
         } catch (error: any) {
-            Alert.alert('Signup Error', error.message);
+            Toast.show({ type: 'error', text1: 'Signup Error', text2: error.message });
         } finally {
             setLoading(false);
         }

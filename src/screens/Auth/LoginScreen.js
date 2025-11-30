@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import { signIn } from '../../services/authService';
 
 const LoginScreen = ({ navigation }) => {
@@ -11,7 +12,7 @@ const LoginScreen = ({ navigation }) => {
     const handleLogin = async () => {
         // Validation
         if (!email || !password) {
-            Alert.alert('Error', 'Please enter both email and password');
+            Toast.show({ type: 'error', text1: 'Error', text2: 'Please enter both email and password' });
             return;
         }
 
@@ -25,7 +26,7 @@ const LoginScreen = ({ navigation }) => {
             // Navigation will be handled by auth state listener in AppNavigator
             console.log('Login successful');
         } else {
-            Alert.alert('Login Failed', result.error);
+            Toast.show({ type: 'error', text1: 'Login Failed', text2: result.error });
         }
     };
 

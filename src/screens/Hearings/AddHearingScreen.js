@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import DatePicker from 'react-native-date-picker';
 import { createHearing, updateHearing } from '../../services/hearingsService';
 import { getCurrentUser } from '../../services/authService';
@@ -25,7 +26,7 @@ const AddHearingScreen = ({ navigation, route }) => {
 
     const handleSave = async () => {
         if (!date || !type) {
-            Alert.alert('Error', 'Date and Type are required');
+            Toast.show({ type: 'error', text1: 'Error', text2: 'Date and Type are required' });
             return;
         }
 
@@ -59,7 +60,7 @@ const AddHearingScreen = ({ navigation, route }) => {
                 [{ text: 'OK', onPress: () => navigation.goBack() }]
             );
         } else {
-            Alert.alert('Error', result.error || 'Failed to save hearing');
+            Toast.show({ type: 'error', text1: 'Error', text2: result.error || 'Failed to save hearing' });
         }
     };
 

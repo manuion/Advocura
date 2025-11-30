@@ -10,6 +10,7 @@ import {
     RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import {
     getCacheStats,
     getCachedDocumentsList,
@@ -41,7 +42,7 @@ const StorageManagementScreen = ({ navigation }) => {
             setDocuments(cachedDocs);
         } catch (error) {
             console.error('[StorageManagement] Error loading data:', error);
-            Alert.alert('Error', 'Failed to load storage information');
+            Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to load storage information' });
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -67,10 +68,10 @@ const StorageManagementScreen = ({ navigation }) => {
                         try {
                             await removeCachedDocument(documentId);
                             await loadStorageData(); // Refresh data
-                            Alert.alert('Success', 'Document removed from cache');
+                            Toast.show({ type: 'success', text1: 'Success', text2: 'Document removed from cache' });
                         } catch (error) {
                             console.error('[StorageManagement] Delete error:', error);
-                            Alert.alert('Error', 'Failed to delete document');
+                            Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to delete document' });
                         } finally {
                             setDeleting(prev => ({ ...prev, [documentId]: false }));
                         }
@@ -95,10 +96,10 @@ const StorageManagementScreen = ({ navigation }) => {
                             const user = getCurrentUser();
                             await clearCache(user?.uid);
                             await loadStorageData(); // Refresh data
-                            Alert.alert('Success', 'All cached documents cleared');
+                            Toast.show({ type: 'success', text1: 'Success', text2: 'All cached documents cleared' });
                         } catch (error) {
                             console.error('[StorageManagement] Clear all error:', error);
-                            Alert.alert('Error', 'Failed to clear cache');
+                            Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to clear cache' });
                         } finally {
                             setLoading(false);
                         }

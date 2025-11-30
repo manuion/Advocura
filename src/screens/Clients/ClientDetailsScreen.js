@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Linking, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import { getClientById, deleteClient } from '../../services/clientsService';
 import { getCurrentUser } from '../../services/authService';
 
@@ -19,7 +20,7 @@ const ClientDetailsScreen = ({ navigation, route }) => {
         if (result.success) {
             setClient(result.client);
         } else {
-            Alert.alert('Error', 'Failed to load client');
+            Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to load client' });
         }
         setLoading(false);
     };
@@ -39,7 +40,7 @@ const ClientDetailsScreen = ({ navigation, route }) => {
                         if (result.success) {
                             navigation.goBack();
                         } else {
-                            Alert.alert('Error', 'Failed to delete client');
+                            Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to delete client' });
                         }
                     }
                 }

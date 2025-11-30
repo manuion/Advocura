@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StatusBar, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import { resetPassword } from '../../services/authService';
 
 const ForgotPasswordScreen = ({ navigation }) => {
@@ -9,7 +10,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
 
     const handleResetPassword = async () => {
         if (!email) {
-            Alert.alert('Error', 'Please enter your email address');
+            Toast.show({ type: 'error', text1: 'Error', text2: 'Please enter your email address' });
             return;
         }
 
@@ -26,7 +27,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
                 [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
             );
         } else {
-            Alert.alert('Error', result.error);
+            Toast.show({ type: 'error', text1: 'Error', text2: result.error });
         }
     };
 

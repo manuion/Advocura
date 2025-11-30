@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert, Modal, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import DatePicker from 'react-native-date-picker';
 import { createCase, updateCase } from '../../services/casesService';
 import { getCurrentUser } from '../../services/authService';
@@ -69,7 +70,7 @@ const AddCaseScreen = ({ navigation, route }) => {
     const handleSave = async () => {
         // Validation
         if (!caseNumber || !title || !selectedClient || !courtName) {
-            Alert.alert('Error', 'Please fill in all required fields (including client)');
+            Toast.show({ type: 'error', text1: 'Error', text2: 'Please fill in all required fields (including client)' });
             return;
         }
 
@@ -81,7 +82,7 @@ const AddCaseScreen = ({ navigation, route }) => {
             // Get current user
             const user = getCurrentUser();
             if (!user) {
-                Alert.alert('Error', 'You must be logged in to save a case');
+                Toast.show({ type: 'error', text1: 'Error', text2: 'You must be logged in to save a case' });
                 setSaving(false);
                 return;
             }
@@ -129,7 +130,7 @@ const AddCaseScreen = ({ navigation, route }) => {
                     [{ text: 'OK', onPress: () => navigation.goBack() }]
                 );
             } else {
-                Alert.alert('Error', result.error || 'Failed to save case');
+                Toast.show({ type: 'error', text1: 'Error', text2: result.error || 'Failed to save case' });
             }
         } catch (error) {
             console.error('=== SAVE ERROR ===');
@@ -138,7 +139,7 @@ const AddCaseScreen = ({ navigation, route }) => {
             console.error('Error stack:', error.stack);
 
             setSaving(false);
-            Alert.alert('Error', `An unexpected error occurred: ${error.message} `);
+            Toast.show({ type: 'error', text1: 'Error', text2: `An unexpected error occurred: ${error.message}` });
         }
     };
 

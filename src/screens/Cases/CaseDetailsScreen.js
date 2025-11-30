@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ActionSheetIOS, Platform, PermissionsAndroid, Linking, NativeModules, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import { getCaseById, deleteCase } from '../../services/casesService';
 import { getCurrentUser } from '../../services/authService';
 import { subscribeToCaseHearings, deleteHearing } from '../../services/hearingsService';
@@ -71,7 +72,7 @@ const CaseDetailsScreen = ({ navigation, route }) => {
         try {
             const user = getCurrentUser();
             if (!user) {
-                Alert.alert('Error', 'You must be logged in');
+                Toast.show({ type: 'error', text1: 'Error', text2: 'You must be logged in' });
                 navigation.goBack();
                 return;
             }
@@ -88,11 +89,11 @@ const CaseDetailsScreen = ({ navigation, route }) => {
                 };
                 setCaseData(caseWithDates);
             } else {
-                Alert.alert('Error', result.error || 'Failed to load case');
+                Toast.show({ type: 'error', text1: 'Error', text2: result.error || 'Failed to load case' });
                 navigation.goBack();
             }
         } catch (error) {
-            Alert.alert('Error', 'An unexpected error occurred');
+            Toast.show({ type: 'error', text1: 'Error', text2: 'An unexpected error occurred' });
             console.error('Load error:', error);
             navigation.goBack();
         } finally {
@@ -141,16 +142,15 @@ const CaseDetailsScreen = ({ navigation, route }) => {
                             const result = await deleteCase(user.uid, caseId);
 
                             if (result.success) {
-                                Alert.alert('Success', 'Case deleted successfully', [
-                                    { text: 'OK', onPress: () => navigation.goBack() }
-                                ]);
+                                Toast.show({ type: 'success', text1: 'Success', text2: 'Case deleted successfully' });
+                                navigation.goBack();
                             } else {
                                 setDeleting(false);
-                                Alert.alert('Error', result.error || 'Failed to delete case');
+                                Toast.show({ type: 'error', text1: 'Error', text2: result.error || 'Failed to delete case' });
                             }
                         } catch (error) {
                             setDeleting(false);
-                            Alert.alert('Error', 'An unexpected error occurred');
+                            Toast.show({ type: 'error', text1: 'Error', text2: 'An unexpected error occurred' });
                             console.error('Delete error:', error);
                         }
                     },
@@ -265,7 +265,7 @@ const CaseDetailsScreen = ({ navigation, route }) => {
             // Request camera permission first
             const hasPermission = await requestCameraPermission();
             if (!hasPermission) {
-                Alert.alert('Permission Denied', 'Camera permission is required to scan documents');
+                Toast.show({ type: 'error', text1: 'Permission Denied', text2: 'Camera permission is required to scan documents' });
                 return;
             }
 
@@ -351,13 +351,14 @@ const CaseDetailsScreen = ({ navigation, route }) => {
                     // Clean up the temporary PDF file
                     await RNFS.unlink(pdfPath);
 
-                    Alert.alert(
-                        'Success',
-                        `${scannedImages.length} page(s) scanned and combined into PDF`
-                    );
+                    Toast.show({
+                        type: 'success',
+                        text1: 'Success',
+                        text2: `${scannedImages.length} page(s) scanned and combined into PDF`
+                    });
                 } catch (error) {
                     console.error('PDF creation/upload error:', error);
-                    Alert.alert('Error', 'Failed to create or upload PDF: ' + error.message);
+                    Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to create or upload PDF: ' + error.message });
                 } finally {
                     setUploading(false);
                 }
@@ -366,7 +367,7 @@ const CaseDetailsScreen = ({ navigation, route }) => {
             console.error('Document scan error:', error);
             setUploading(false);
             if (error.message !== 'User canceled') {
-                Alert.alert('Error', 'Failed to scan document: ' + error.message);
+                Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to scan document: ' + error.message });
             }
         }
     };
@@ -433,7 +434,7 @@ const CaseDetailsScreen = ({ navigation, route }) => {
         // Request storage permission first
         const hasPermission = await requestStoragePermission();
         if (!hasPermission) {
-            Alert.alert('Permission Denied', 'Storage permission is required to access photos');
+            Toast.show({ type: 'error', text1: 'Permission Denied', text2: 'Storage permission is required to access photos' });
             return;
         }
 
@@ -447,7 +448,7 @@ const CaseDetailsScreen = ({ navigation, route }) => {
         }
 
         if (result.errorCode) {
-            Alert.alert('Error', result.errorMessage || 'Failed to pick image');
+            Toast.show({ type: 'error', text1: 'Error', text2: result.errorMessage || 'Failed to pick image' });
             return;
         }
 
@@ -493,7 +494,7 @@ const CaseDetailsScreen = ({ navigation, route }) => {
                 // User cancelled the picker, ignore
             } else {
                 console.error('Document picker error:', err);
-                Alert.alert('Error', err.message || 'Failed to pick document');
+                Toast.show({ type: 'error', text1: 'Error', text2: err.message || 'Failed to pick document' });
             }
         }
     };
@@ -502,7 +503,7 @@ const CaseDetailsScreen = ({ navigation, route }) => {
         try {
             // Check size (limit to 10MB)
             if (file.size > 10 * 1024 * 1024) {
-                Alert.alert('Error', 'File size exceeds 10MB limit');
+                Toast.show({ type: 'error', text1: 'Error', text2: 'File size exceeds 10MB limit' });
                 return;
             }
 
@@ -525,7 +526,7 @@ const CaseDetailsScreen = ({ navigation, route }) => {
                 } catch (copyError) {
                     console.error('Failed to copy file to cache:', copyError);
                     setUploading(false);
-                    Alert.alert('Error', 'Failed to process file. Please try again or use a different file.');
+                    Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to process file. Please try again or use a different file.' });
                     return;
                 }
             }
@@ -535,14 +536,14 @@ const CaseDetailsScreen = ({ navigation, route }) => {
             setUploading(false);
 
             if (result.success) {
-                Alert.alert('Success', 'Document uploaded successfully');
+                Toast.show({ type: 'success', text1: 'Success', text2: 'Document uploaded successfully' });
             } else {
-                Alert.alert('Error', result.error || 'Failed to upload document');
+                Toast.show({ type: 'error', text1: 'Error', text2: result.error || 'Failed to upload document' });
             }
         } catch (error) {
             setUploading(false);
             console.error('Upload error:', error);
-            Alert.alert('Error', 'Failed to upload file');
+            Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to upload file' });
         }
     };
 
@@ -568,7 +569,7 @@ const CaseDetailsScreen = ({ navigation, route }) => {
 
     const handleViewDocument = async (doc) => {
         if (!doc.downloadUrl) {
-            Alert.alert('Error', 'Document URL not available');
+            Toast.show({ type: 'error', text1: 'Error', text2: 'Document URL not available' });
             return;
         }
 
@@ -579,7 +580,7 @@ const CaseDetailsScreen = ({ navigation, route }) => {
     const handleShareDocument = async (doc) => {
         try {
             if (!doc.downloadUrl) {
-                Alert.alert('Error', 'Document URL not available');
+                Toast.show({ type: 'error', text1: 'Error', text2: 'Document URL not available' });
                 return;
             }
 
@@ -606,12 +607,12 @@ const CaseDetailsScreen = ({ navigation, route }) => {
                     RNFS.unlink(tempPath).catch(() => { });
                 }, 5000);
             } else {
-                Alert.alert('Error', 'Failed to prepare document for sharing');
+                Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to prepare document for sharing' });
             }
         } catch (error) {
             if (error.message !== 'User did not share') {
                 console.error('Share error:', error);
-                Alert.alert('Error', 'Failed to share document');
+                Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to share document' });
             }
         }
     };
@@ -658,10 +659,10 @@ const CaseDetailsScreen = ({ navigation, route }) => {
 
                             setSelectedDocuments([]);
                             setMultiSelectMode(false);
-                            Alert.alert('Success', `${selectedDocuments.length} document(s) deleted`);
+                            Toast.show({ type: 'success', text1: 'Success', text2: `${selectedDocuments.length} document(s) deleted` });
                         } catch (error) {
                             console.error('Bulk delete error:', error);
-                            Alert.alert('Error', 'Failed to delete some documents');
+                            Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to delete some documents' });
                         }
                     }
                 }
@@ -706,12 +707,12 @@ const CaseDetailsScreen = ({ navigation, route }) => {
                     });
                 }, 5000);
             } else {
-                Alert.alert('Error', 'Failed to prepare documents for sharing');
+                Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to prepare documents for sharing' });
             }
         } catch (error) {
             if (error.message !== 'User did not share') {
                 console.error('Bulk share error:', error);
-                Alert.alert('Error', 'Failed to share documents');
+                Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to share documents' });
             }
         }
     };

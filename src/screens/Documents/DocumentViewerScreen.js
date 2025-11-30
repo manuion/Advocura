@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity, Image, Alert, Platform, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import Share from 'react-native-share';
 import RNFS from 'react-native-fs';
 import { WebView } from 'react-native-webview';
@@ -113,7 +114,7 @@ const DocumentViewerScreen = ({ navigation, route }) => {
                 }).promise;
 
                 if (downloadResult.statusCode !== 200) {
-                    Alert.alert('Error', 'Failed to download file for sharing');
+                    Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to download file for sharing' });
                     setSharing(false);
                     return;
                 }
@@ -130,7 +131,7 @@ const DocumentViewerScreen = ({ navigation, route }) => {
         } catch (err) {
             if (err.message !== 'User did not share') {
                 console.error('Share error:', err);
-                Alert.alert('Error', 'Failed to share document');
+                Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to share document' });
             }
         } finally {
             setSharing(false);

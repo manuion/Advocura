@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import { getCurrentUser, getUserProfile, updateUserProfile } from '../../services/authService';
 
 const EditProfileScreen = ({ navigation }) => {
@@ -29,7 +30,7 @@ const EditProfileScreen = ({ navigation }) => {
 
     const handleSave = async () => {
         if (!name.trim()) {
-            Alert.alert('Error', 'Name is required');
+            Toast.show({ type: 'error', text1: 'Error', text2: 'Name is required' });
             return;
         }
 
@@ -50,7 +51,7 @@ const EditProfileScreen = ({ navigation }) => {
                 { text: 'OK', onPress: () => navigation.goBack() }
             ]);
         } else {
-            Alert.alert('Error', result.error || 'Failed to update profile');
+            Toast.show({ type: 'error', text1: 'Error', text2: result.error || 'Failed to update profile' });
         }
     };
 

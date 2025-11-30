@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import { subscribeToClients, deleteClient } from '../../services/clientsService';
 import { getCurrentUser } from '../../services/authService';
 
@@ -63,7 +64,7 @@ const ClientsListScreen = ({ navigation }) => {
                         const user = getCurrentUser();
                         const result = await deleteClient(user.uid, clientId);
                         if (!result.success) {
-                            Alert.alert('Error', 'Failed to delete client');
+                            Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to delete client' });
                         }
                     }
                 }

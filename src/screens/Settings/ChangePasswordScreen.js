@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import auth from '@react-native-firebase/auth';
 
 const ChangePasswordScreen = ({ navigation }) => {
@@ -11,17 +12,17 @@ const ChangePasswordScreen = ({ navigation }) => {
 
     const handleChangePassword = async () => {
         if (!currentPassword || !newPassword || !confirmPassword) {
-            Alert.alert('Error', 'Please fill in all fields');
+            Toast.show({ type: 'error', text1: 'Error', text2: 'Please fill in all fields' });
             return;
         }
 
         if (newPassword !== confirmPassword) {
-            Alert.alert('Error', 'New passwords do not match');
+            Toast.show({ type: 'error', text1: 'Error', text2: 'New passwords do not match' });
             return;
         }
 
         if (newPassword.length < 6) {
-            Alert.alert('Error', 'Password must be at least 6 characters long');
+            Toast.show({ type: 'error', text1: 'Error', text2: 'Password must be at least 6 characters long' });
             return;
         }
 
@@ -44,9 +45,9 @@ const ChangePasswordScreen = ({ navigation }) => {
             setLoading(false);
             console.error(error);
             if (error.code === 'auth/wrong-password') {
-                Alert.alert('Error', 'Current password is incorrect');
+                Toast.show({ type: 'error', text1: 'Error', text2: 'Current password is incorrect' });
             } else {
-                Alert.alert('Error', 'Failed to update password. Please try again.');
+                Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to update password. Please try again.' });
             }
         }
     };

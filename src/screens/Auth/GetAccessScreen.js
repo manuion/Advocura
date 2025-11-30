@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StatusBar, StyleSheet, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import { signUp } from '../../services/authService';
 
 const GetAccessScreen = ({ navigation }) => {
@@ -14,12 +15,12 @@ const GetAccessScreen = ({ navigation }) => {
     const handleSubmit = async () => {
         // Validation
         if (!fullName || !email || !password) {
-            Alert.alert('Error', 'Please fill in all required fields');
+            Toast.show({ type: 'error', text1: 'Error', text2: 'Please fill in all required fields' });
             return;
         }
 
         if (password.length < 6) {
-            Alert.alert('Error', 'Password must be at least 6 characters');
+            Toast.show({ type: 'error', text1: 'Error', text2: 'Password must be at least 6 characters' });
             return;
         }
 
@@ -41,7 +42,7 @@ const GetAccessScreen = ({ navigation }) => {
             );
             // Navigation will be handled by auth state listener
         } else {
-            Alert.alert('Signup Failed', result.error);
+            Toast.show({ type: 'error', text1: 'Signup Failed', text2: result.error });
         }
     };
 

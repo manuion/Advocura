@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import { createClient, updateClient, getClientById } from '../../services/clientsService';
 import { getCurrentUser } from '../../services/authService';
 
@@ -36,7 +37,7 @@ const AddClientScreen = ({ navigation, route }) => {
 
     const handleSave = async () => {
         if (!name.trim()) {
-            Alert.alert('Error', 'Please enter client name');
+            Toast.show({ type: 'error', text1: 'Error', text2: 'Please enter client name' });
             return;
         }
 
@@ -68,7 +69,7 @@ const AddClientScreen = ({ navigation, route }) => {
                 [{ text: 'OK', onPress: () => navigation.goBack() }]
             );
         } else {
-            Alert.alert('Error', result.error || 'Failed to save client');
+            Toast.show({ type: 'error', text1: 'Error', text2: result.error || 'Failed to save client' });
         }
     };
 
