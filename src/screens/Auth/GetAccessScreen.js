@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StatusBar, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StatusBar, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { signUp } from '../../services/authService';
@@ -35,11 +35,11 @@ const GetAccessScreen = ({ navigation }) => {
         setLoading(false);
 
         if (result.success) {
-            Alert.alert(
-                'Success',
-                'Account created successfully!',
-                [{ text: 'OK', onPress: () => console.log('Signup successful') }]
-            );
+            Toast.show({
+                type: 'success',
+                text1: 'Success',
+                text2: 'Account created successfully!'
+            });
             // Navigation will be handled by auth state listener
         } else {
             Toast.show({ type: 'error', text1: 'Signup Failed', text2: result.error });

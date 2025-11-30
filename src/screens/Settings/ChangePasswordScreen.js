@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import auth from '@react-native-firebase/auth';
@@ -38,9 +38,12 @@ const ChangePasswordScreen = ({ navigation }) => {
             await user.updatePassword(newPassword);
 
             setLoading(false);
-            Alert.alert('Success', 'Password updated successfully', [
-                { text: 'OK', onPress: () => navigation.goBack() }
-            ]);
+            Toast.show({
+                type: 'success',
+                text1: 'Success',
+                text2: 'Password updated successfully'
+            });
+            navigation.goBack();
         } catch (error) {
             setLoading(false);
             console.error(error);

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StatusBar, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StatusBar, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { resetPassword } from '../../services/authService';
@@ -21,11 +21,12 @@ const ForgotPasswordScreen = ({ navigation }) => {
         setLoading(false);
 
         if (result.success) {
-            Alert.alert(
-                'Success',
-                'Password reset email sent! Please check your inbox.',
-                [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
-            );
+            Toast.show({
+                type: 'success',
+                text1: 'Success',
+                text2: 'Password reset email sent! Please check your inbox.'
+            });
+            navigation.navigate('Login');
         } else {
             Toast.show({ type: 'error', text1: 'Error', text2: result.error });
         }

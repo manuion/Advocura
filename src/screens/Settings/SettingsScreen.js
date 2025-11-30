@@ -136,7 +136,11 @@ const SettingsScreen = ({ navigation }) => {
                             const { exportUserData } = require('../../services/exportService');
                             const user = getCurrentUser();
                             if (user) {
-                                Alert.alert('Exporting...', 'Please wait while we prepare your data.');
+                                Toast.show({
+                                    type: 'info',
+                                    text1: 'Exporting...',
+                                    text2: 'Please wait while we prepare your data.'
+                                });
                                 await exportUserData(user.uid);
                             }
                         }}

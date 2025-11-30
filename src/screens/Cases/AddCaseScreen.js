@@ -124,11 +124,12 @@ const AddCaseScreen = ({ navigation, route }) => {
             setSaving(false);
 
             if (result.success) {
-                Alert.alert(
-                    'Success',
-                    `Case ${isEditMode ? 'updated' : 'created'} successfully!`,
-                    [{ text: 'OK', onPress: () => navigation.goBack() }]
-                );
+                Toast.show({
+                    type: 'success',
+                    text1: 'Success',
+                    text2: `Case ${isEditMode ? 'updated' : 'created'} successfully!`
+                });
+                navigation.goBack();
             } else {
                 Toast.show({ type: 'error', text1: 'Error', text2: result.error || 'Failed to save case' });
             }

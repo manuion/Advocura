@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { createClient, updateClient, getClientById } from '../../services/clientsService';
@@ -63,11 +63,12 @@ const AddClientScreen = ({ navigation, route }) => {
         setLoading(false);
 
         if (result.success) {
-            Alert.alert(
-                'Success',
-                `Client ${isEditMode ? 'updated' : 'created'} successfully!`,
-                [{ text: 'OK', onPress: () => navigation.goBack() }]
-            );
+            Toast.show({
+                type: 'success',
+                text1: 'Success',
+                text2: `Client ${isEditMode ? 'updated' : 'created'} successfully!`
+            });
+            navigation.goBack();
         } else {
             Toast.show({ type: 'error', text1: 'Error', text2: result.error || 'Failed to save client' });
         }
