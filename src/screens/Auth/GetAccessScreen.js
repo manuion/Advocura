@@ -103,11 +103,12 @@ const GetAccessScreen = ({ navigation }) => {
                         <Text style={styles.label}>PHONE NUMBER</Text>
                         <TextInput
                             style={styles.input}
-                            placeholder="+1 (555) 123-4567"
+                            placeholder="9876543210"
                             placeholderTextColor="#555"
                             value={phone}
                             onChangeText={setPhone}
                             keyboardType="phone-pad"
+                            maxLength={10}
                         />
                     </View>
 

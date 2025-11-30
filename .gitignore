@@ -33,6 +33,7 @@ local.properties
 .cxx/
 *.keystore
 !debug.keystore
+keystore.properties
 .kotlin/
 
 # node.js
@@ -55,6 +56,10 @@ yarn-error.log
 
 # Bundle artifact
 *.jsbundle
+
+# Release artifacts
+*.apk
+*.aab
 
 # Ruby / CocoaPods
 **/Pods/

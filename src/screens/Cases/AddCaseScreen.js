@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert, Modal, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 import DatePicker from 'react-native-date-picker';
 import { createCase, updateCase } from '../../services/casesService';
 import { getCurrentUser } from '../../services/authService';
-import { getClients } from '../../services/clientsService';
+import { getClients, createClient } from '../../services/clientsService';
 
 const AddCaseScreen = ({ navigation, route }) => {
     const isEditMode = route?.params?.caseData;
@@ -26,6 +27,8 @@ const AddCaseScreen = ({ navigation, route }) => {
     const [clients, setClients] = useState([]);
     const [clientSearch, setClientSearch] = useState('');
     const [filteredClients, setFilteredClients] = useState([]);
+    const [quickAddClientName, setQuickAddClientName] = useState('');
+    const [creatingClient, setCreatingClient] = useState(false);
 
     // Date states
     const [filingDate, setFilingDate] = useState(existingCase.filingDate || new Date());
@@ -43,6 +46,13 @@ const AddCaseScreen = ({ navigation, route }) => {
     useEffect(() => {
         loadClients();
     }, []);
+
+    // Refresh clients when screen comes into focus (e.g., returning from Add Client screen)
+    useFocusEffect(
+        React.useCallback(() => {
+            loadClients();
+        }, [])
+    );
 
     useEffect(() => {
         if (clientSearch.trim() === '') {
@@ -65,6 +75,45 @@ const AddCaseScreen = ({ navigation, route }) => {
             setClients(result.clients);
             setFilteredClients(result.clients);
         }
+    };
+
+    const handleQuickAddClient = async () => {
+        if (!quickAddClientName.trim()) {
+            Toast.show({ type: 'error', text1: 'Error', text2: 'Please enter a client name' });
+            return;
+        }
+
+        setCreatingClient(true);
+        const user = getCurrentUser();
+
+        const result = await createClient(user.uid, {
+            name: quickAddClientName.trim(),
+        });
+
+        setCreatingClient(false);
+
+        if (result.success) {
+            Toast.show({ type: 'success', text1: 'Success', text2: 'Client created successfully' });
+            setQuickAddClientName('');
+            // Reload clients and auto-select the new one
+            await loadClients();
+            // Find and select the newly created client
+            const newlyCreated = { id: result.clientId, name: quickAddClientName.trim() };
+            setSelectedClient(newlyCreated);
+            setShowClientPicker(false);
+        } else {
+            Toast.show({ type: 'error', text1: 'Error', text2: result.error });
+        }
+    };
+
+    const handleOpenClientPicker = () => {
+        setShowClientPicker(true);
+        loadClients(); // Refresh clients when opening picker
+    };
+
+    const handleNavigateToAddClient = () => {
+        setShowClientPicker(false);
+        navigation.navigate('AddClient');
     };
 
     const handleSave = async () => {
@@ -200,7 +249,7 @@ const AddCaseScreen = ({ navigation, route }) => {
                     <Text style={styles.label}>CLIENT *</Text>
                     <TouchableOpacity
                         style={styles.clientPickerButton}
-                        onPress={() => setShowClientPicker(true)}
+                        onPress={handleOpenClientPicker}
                     >
                         <Text style={selectedClient ? styles.clientPickerTextSelected : styles.clientPickerTextPlaceholder}>
                             {selectedClient ? selectedClient.name : 'Tap to select client'}
@@ -418,13 +467,53 @@ const AddCaseScreen = ({ navigation, route }) => {
                             </TouchableOpacity>
                         </View>
 
+                        {/* Quick Add Client */}
+                        <View style={styles.quickAddContainer}>
+                            <Text style={styles.quickAddLabel}>Quick Add Client (name only):</Text>
+                            <View style={styles.quickAddRow}>
+                                <TextInput
+                                    style={styles.quickAddInput}
+                                    placeholder="Type client name here..."
+                                    placeholderTextColor="#666"
+                                    value={quickAddClientName}
+                                    onChangeText={setQuickAddClientName}
+                                    editable={!creatingClient}
+                                />
+                                <TouchableOpacity
+                                    style={[styles.quickAddButton, creatingClient && styles.quickAddButtonDisabled]}
+                                    onPress={handleQuickAddClient}
+                                    disabled={creatingClient}
+                                >
+                                    <Text style={styles.quickAddButtonText}>
+                                        {creatingClient ? '...' : 'Add'}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        {/* Create Full Client Button */}
+                        <TouchableOpacity
+                            style={styles.createFullClientButton}
+                            onPress={handleNavigateToAddClient}
+                        >
+                            <Text style={styles.createFullClientButtonText}>
+                                + Create Client with Full Details
+                            </Text>
+                        </TouchableOpacity>
+
+                        {/* Divider */}
+                        <View style={styles.divider}>
+                            <View style={styles.dividerLine} />
+                            <Text style={styles.dividerText}>OR SELECT EXISTING</Text>
+                            <View style={styles.dividerLine} />
+                        </View>
+
                         <TextInput
                             style={styles.modalSearch}
-                            placeholder="Search clients..."
+                            placeholder="Search existing clients..."
                             placeholderTextColor="#666"
                             value={clientSearch}
                             onChangeText={setClientSearch}
-                            autoFocus
                         />
 
                         <FlatList
@@ -712,6 +801,83 @@ const styles = StyleSheet.create({
         color: '#666',
         fontSize: 14,
         textAlign: 'center',
+    },
+    quickAddContainer: {
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        paddingBottom: 12,
+    },
+    quickAddLabel: {
+        color: '#CD7F32',
+        fontSize: 12,
+        fontWeight: 'bold',
+        marginBottom: 8,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+    },
+    quickAddRow: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    quickAddInput: {
+        flex: 1,
+        backgroundColor: '#121212',
+        color: '#FFFFFF',
+        padding: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#333',
+        fontSize: 15,
+    },
+    quickAddButton: {
+        backgroundColor: '#CD7F32',
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        minWidth: 60,
+    },
+    quickAddButtonDisabled: {
+        opacity: 0.5,
+    },
+    quickAddButtonText: {
+        color: '#121212',
+        fontSize: 15,
+        fontWeight: 'bold',
+    },
+    createFullClientButton: {
+        backgroundColor: '#2A2A2A',
+        marginHorizontal: 20,
+        marginTop: 8,
+        padding: 14,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#CD7F32',
+        alignItems: 'center',
+    },
+    createFullClientButtonText: {
+        color: '#CD7F32',
+        fontSize: 14,
+        fontWeight: 'bold',
+    },
+    divider: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginHorizontal: 20,
+        marginVertical: 16,
+    },
+    dividerLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: '#333',
+    },
+    dividerText: {
+        color: '#666',
+        fontSize: 11,
+        fontWeight: 'bold',
+        marginHorizontal: 12,
+        letterSpacing: 1,
     },
 });
 

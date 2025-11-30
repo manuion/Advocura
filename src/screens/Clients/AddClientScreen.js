@@ -118,11 +118,12 @@ const AddClientScreen = ({ navigation, route }) => {
                     <Text style={styles.label}>PHONE</Text>
                     <TextInput
                         style={styles.input}
-                        placeholder="e.g., 9876543210"
+                        placeholder="9876543210"
                         placeholderTextColor="#555"
                         value={phone}
                         onChangeText={setPhone}
                         keyboardType="phone-pad"
+                        maxLength={10}
                     />
                 </View>
 

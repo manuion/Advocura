@@ -99,9 +99,10 @@ const EditProfileScreen = ({ navigation }) => {
                         style={styles.input}
                         value={phone}
                         onChangeText={setPhone}
-                        placeholder="Enter phone number"
+                        placeholder="9876543210"
                         placeholderTextColor="#555"
                         keyboardType="phone-pad"
+                        maxLength={10}
                     />
                 </View>
 
