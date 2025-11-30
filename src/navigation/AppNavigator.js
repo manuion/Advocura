@@ -12,12 +12,14 @@ import CasesListScreen from '../screens/Cases/CasesListScreen';
 import AddCaseScreen from '../screens/Cases/AddCaseScreen';
 import CaseDetailsScreen from '../screens/Cases/CaseDetailsScreen';
 import AddHearingScreen from '../screens/Hearings/AddHearingScreen';
+import DocumentViewerScreen from '../screens/Documents/DocumentViewerScreen';
 import ClientsListScreen from '../screens/Clients/ClientsListScreen';
 import AddClientScreen from '../screens/Clients/AddClientScreen';
 import ClientDetailsScreen from '../screens/Clients/ClientDetailsScreen';
 import SettingsScreen from '../screens/Settings/SettingsScreen';
 import EditProfileScreen from '../screens/Settings/EditProfileScreen';
 import ChangePasswordScreen from '../screens/Settings/ChangePasswordScreen';
+import StorageManagementScreen from '../screens/Settings/StorageManagementScreen';
 import SearchScreen from '../screens/Search/SearchScreen';
 import ReportsScreen from '../screens/Reports/ReportsScreen';
 
@@ -35,6 +37,7 @@ const CasesStackNavigator = () => {
             <CasesStack.Screen name="AddCase" component={AddCaseScreen} />
             <CasesStack.Screen name="CaseDetails" component={CaseDetailsScreen} />
             <CasesStack.Screen name="AddHearing" component={AddHearingScreen} />
+            <CasesStack.Screen name="DocumentViewer" component={DocumentViewerScreen} />
         </CasesStack.Navigator>
     );
 };
@@ -57,6 +60,7 @@ const SettingsStackNavigator = () => {
             <SettingsStack.Screen name="Settings" component={SettingsScreen} />
             <SettingsStack.Screen name="EditProfile" component={EditProfileScreen} />
             <SettingsStack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+            <SettingsStack.Screen name="StorageManagement" component={StorageManagementScreen} />
             <SettingsStack.Screen name="Reports" component={ReportsScreen} />
         </SettingsStack.Navigator>
     );

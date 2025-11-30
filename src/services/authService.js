@@ -1,5 +1,6 @@
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
+import { clearCachedConfig } from './cacheConfigService';
 
 /**
  * Authentication Service - Firebase Auth operations
@@ -56,6 +57,10 @@ export const signIn = async (email, password) => {
 export const signOut = async () => {
     try {
         await auth().signOut();
+
+        // Clear cached config to force fresh fetch on next login
+        await clearCachedConfig();
+
         return { success: true };
     } catch (error) {
         console.error('Error signing out:', error);

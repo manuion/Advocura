@@ -2,6 +2,7 @@ import firestore from '@react-native-firebase/firestore';
 import storage from '@react-native-firebase/storage';
 import { Platform } from 'react-native';
 import RNFS from 'react-native-fs';
+import { removeCachedDocument } from './documentCacheService';
 
 /**
  * Documents Service - Firebase Storage & Firestore operations
@@ -131,10 +132,21 @@ export const getDocumentsByCaseId = async (userId, caseId) => {
 // Delete a document
 export const deleteDocument = async (userId, documentId, storagePath) => {
     try {
-        // 1. Delete from Storage
+        // 1. Delete from Storage (handle if file doesn't exist)
         if (storagePath) {
-            const reference = storage().ref(storagePath);
-            await reference.delete();
+            try {
+                const reference = storage().ref(storagePath);
+                await reference.delete();
+                console.log('Document deleted from storage:', storagePath);
+            } catch (storageError) {
+                // If file doesn't exist in storage, log but continue with Firestore deletion
+                if (storageError.code === 'storage/object-not-found') {
+                    console.log('File not found in storage (may have been already deleted):', storagePath);
+                } else {
+                    console.error('Storage deletion error:', storageError);
+                    // For other storage errors, still try to delete from Firestore
+                }
+            }
         }
 
         // 2. Delete from Firestore
@@ -144,6 +156,17 @@ export const deleteDocument = async (userId, documentId, storagePath) => {
             .collection('documents')
             .doc(documentId)
             .delete();
+
+        console.log('Document deleted from Firestore:', documentId);
+
+        // 3. Clear from local cache
+        try {
+            await removeCachedDocument(documentId);
+            console.log('Document removed from local cache:', documentId);
+        } catch (cacheError) {
+            // Log but don't fail the deletion if cache cleanup fails
+            console.warn('Failed to remove document from cache:', cacheError);
+        }
 
         return { success: true };
     } catch (error) {

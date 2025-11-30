@@ -89,6 +89,15 @@ const SettingsScreen = ({ navigation }) => {
                         <Text style={styles.menuText}>Reports & Analytics</Text>
                         <Text style={styles.menuArrow}>›</Text>
                     </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={() => navigation.navigate('StorageManagement')}
+                    >
+                        <Text style={styles.menuIcon}>💾</Text>
+                        <Text style={styles.menuText}>Storage Management</Text>
+                        <Text style={styles.menuArrow}>›</Text>
+                    </TouchableOpacity>
                 </View>
 
                 {/* Account Section */}
