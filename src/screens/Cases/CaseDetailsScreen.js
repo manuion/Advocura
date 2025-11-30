@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ActionSheetIOS, Platform, PermissionsAndroid } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ActionSheetIOS, Platform, PermissionsAndroid, Linking, NativeModules } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getCaseById, deleteCase } from '../../services/casesService';
 import { getCurrentUser } from '../../services/authService';
 import { subscribeToCaseHearings, deleteHearing } from '../../services/hearingsService';
 import { uploadDocument, subscribeToCaseDocuments, deleteDocument } from '../../services/documentsService';
 import DocumentPicker from 'react-native-document-picker';
-import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
+import { launchImageLibrary } from 'react-native-image-picker';
+import DocumentScanner from 'react-native-document-scanner-plugin';
 import RNFS from 'react-native-fs';
+import Share from 'react-native-share';
+import { jsPDF } from 'jspdf';
 
 const CaseDetailsScreen = ({ navigation, route }) => {
     const { caseId } = route.params;
@@ -24,6 +27,8 @@ const CaseDetailsScreen = ({ navigation, route }) => {
     const [documents, setDocuments] = useState([]);
     const [documentsLoading, setDocumentsLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
+    const [multiSelectMode, setMultiSelectMode] = useState(false);
+    const [selectedDocuments, setSelectedDocuments] = useState([]);
 
     useEffect(() => {
         loadCase();
@@ -221,7 +226,7 @@ const CaseDetailsScreen = ({ navigation, route }) => {
         if (Platform.OS === 'ios') {
             ActionSheetIOS.showActionSheetWithOptions(
                 {
-                    options: ['Choose Document', 'Choose from Gallery', 'Take Photo', 'Cancel'],
+                    options: ['Choose Document', 'Choose from Gallery', 'Scan Document', 'Cancel'],
                     cancelButtonIndex: 3,
                 },
                 (buttonIndex) => {
@@ -230,7 +235,7 @@ const CaseDetailsScreen = ({ navigation, route }) => {
                     } else if (buttonIndex === 1) {
                         handleImagePicker();
                     } else if (buttonIndex === 2) {
-                        handleCameraCapture();
+                        handleDocumentScan();
                     }
                 }
             );
@@ -242,7 +247,7 @@ const CaseDetailsScreen = ({ navigation, route }) => {
                 [
                     { text: 'Choose Document', onPress: handleDocumentPicker },
                     { text: 'Choose from Gallery', onPress: handleImagePicker },
-                    { text: 'Take Photo', onPress: handleCameraCapture },
+                    { text: 'Scan Document', onPress: handleDocumentScan },
                     { text: 'Cancel', style: 'cancel' },
                 ],
                 { cancelable: true }
@@ -250,36 +255,112 @@ const CaseDetailsScreen = ({ navigation, route }) => {
         }
     };
 
-    const handleCameraCapture = async () => {
-        // Request camera permission first
-        const hasPermission = await requestCameraPermission();
-        if (!hasPermission) {
-            Alert.alert('Permission Denied', 'Camera permission is required to take photos');
-            return;
+    const handleDocumentScan = async () => {
+        try {
+            // Request camera permission first
+            const hasPermission = await requestCameraPermission();
+            if (!hasPermission) {
+                Alert.alert('Permission Denied', 'Camera permission is required to scan documents');
+                return;
+            }
+
+            // Launch document scanner
+            const { scannedImages } = await DocumentScanner.scanDocument({
+                maxNumDocuments: 10, // Allow up to 10 pages
+                letUserAdjustCrop: true, // Let user adjust the detected edges
+                croppedImageQuality: 100, // High quality output
+            });
+
+            if (!scannedImages || scannedImages.length === 0) {
+                // User cancelled or no images scanned
+                return;
+            }
+
+            console.log(`Scanned ${scannedImages.length} page(s)`);
+
+            // Generate a unique document ID for this scan session
+            const scanId = Date.now();
+            const pdfFileName = `scan_${scanId}.pdf`;
+
+            setUploading(true);
+
+            try {
+                // Create PDF from scanned images
+                const pdfPath = `${RNFS.DocumentDirectoryPath}/${pdfFileName}`;
+
+                console.log('Creating PDF from scanned pages...');
+
+                // Create a new PDF document (A4 size: 210mm x 297mm)
+                const doc = new jsPDF({
+                    orientation: 'portrait',
+                    unit: 'mm',
+                    format: 'a4'
+                });
+
+                // Add each scanned image as a page in the PDF
+                for (let i = 0; i < scannedImages.length; i++) {
+                    let imageUri = scannedImages[i];
+                    if (imageUri.startsWith('file://')) {
+                        imageUri = imageUri.replace('file://', '');
+                    }
+
+                    console.log(`Adding page ${i + 1}/${scannedImages.length} to PDF`);
+
+                    // Read image as base64
+                    const imageBase64 = await RNFS.readFile(imageUri, 'base64');
+
+                    // Add new page if not the first image
+                    if (i > 0) {
+                        doc.addPage();
+                    }
+
+                    // Add image to PDF (fit to A4 page)
+                    const imageData = `data:image/jpeg;base64,${imageBase64}`;
+                    doc.addImage(imageData, 'JPEG', 0, 0, 210, 297);
+                }
+
+                // Get PDF as base64 string
+                const pdfBase64 = doc.output('datauristring').split(',')[1];
+
+                // Write PDF to file system
+                await RNFS.writeFile(pdfPath, pdfBase64, 'base64');
+                console.log('PDF created successfully');
+
+                // Get PDF file stats
+                const pdfStats = await RNFS.stat(pdfPath);
+
+                // Upload the PDF
+                console.log(`Uploading PDF: ${pdfFileName} (${pdfStats.size} bytes)`);
+
+                await uploadFile({
+                    uri: `file://${pdfPath}`,
+                    type: 'application/pdf',
+                    name: pdfFileName,
+                    size: pdfStats.size,
+                });
+
+                console.log('PDF uploaded successfully');
+
+                // Clean up the temporary PDF file
+                await RNFS.unlink(pdfPath);
+
+                Alert.alert(
+                    'Success',
+                    `${scannedImages.length} page(s) scanned and combined into PDF`
+                );
+            } catch (error) {
+                console.error('PDF creation/upload error:', error);
+                Alert.alert('Error', 'Failed to create or upload PDF: ' + error.message);
+            } finally {
+                setUploading(false);
+            }
+        } catch (error) {
+            console.error('Document scan error:', error);
+            setUploading(false);
+            if (error.message !== 'User canceled') {
+                Alert.alert('Error', 'Failed to scan document: ' + error.message);
+            }
         }
-
-        const result = await launchCamera({
-            mediaType: 'photo',
-            quality: 0.8,
-            saveToPhotos: true,
-        });
-
-        if (result.didCancel) {
-            return;
-        }
-
-        if (result.errorCode) {
-            Alert.alert('Error', result.errorMessage || 'Failed to capture photo');
-            return;
-        }
-
-        const photo = result.assets[0];
-        await uploadFile({
-            uri: photo.uri,
-            type: photo.type,
-            name: photo.fileName || `photo_${Date.now()}.jpg`,
-            size: photo.fileSize,
-        });
     };
 
     const handleImagePicker = async () => {
@@ -407,6 +488,156 @@ const CaseDetailsScreen = ({ navigation, route }) => {
                 }
             ]
         );
+    };
+
+    const handleViewDocument = async (doc) => {
+        if (!doc.downloadUrl) {
+            Alert.alert('Error', 'Document URL not available');
+            return;
+        }
+
+        // Navigate to DocumentViewer for both PDFs and images
+        navigation.navigate('DocumentViewer', { document: doc });
+    };
+
+    const handleShareDocument = async (doc) => {
+        try {
+            if (!doc.downloadUrl) {
+                Alert.alert('Error', 'Document URL not available');
+                return;
+            }
+
+            // First download the file to share actual file (not URL)
+            const tempPath = `${RNFS.CachesDirectoryPath}/${doc.name}`;
+
+            // Download file
+            const downloadResult = await RNFS.downloadFile({
+                fromUrl: doc.downloadUrl,
+                toFile: tempPath,
+            }).promise;
+
+            if (downloadResult.statusCode === 200) {
+                // Share the local file
+                await Share.open({
+                    url: Platform.OS === 'android' ? `file://${tempPath}` : tempPath,
+                    title: doc.name,
+                    subject: doc.name,
+                    filename: doc.name,
+                });
+
+                // Clean up temp file after sharing
+                setTimeout(() => {
+                    RNFS.unlink(tempPath).catch(() => { });
+                }, 5000);
+            } else {
+                Alert.alert('Error', 'Failed to prepare document for sharing');
+            }
+        } catch (error) {
+            if (error.message !== 'User did not share') {
+                console.error('Share error:', error);
+                Alert.alert('Error', 'Failed to share document');
+            }
+        }
+    };
+
+    // Multi-select handlers
+    const toggleMultiSelectMode = () => {
+        setMultiSelectMode(!multiSelectMode);
+        setSelectedDocuments([]); // Clear selection when toggling mode
+    };
+
+    const toggleDocumentSelection = (docId) => {
+        setSelectedDocuments(prev => {
+            if (prev.includes(docId)) {
+                return prev.filter(id => id !== docId);
+            } else {
+                return [...prev, docId];
+            }
+        });
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedDocuments.length === 0) return;
+
+        Alert.alert(
+            'Delete Documents',
+            `Are you sure you want to delete ${selectedDocuments.length} document(s)?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            const user = getCurrentUser();
+                            if (!user) return;
+
+                            // Delete each selected document
+                            for (const docId of selectedDocuments) {
+                                const doc = documents.find(d => d.id === docId);
+                                if (doc) {
+                                    await deleteDocument(user.uid, docId, doc.storagePath);
+                                }
+                            }
+
+                            setSelectedDocuments([]);
+                            setMultiSelectMode(false);
+                            Alert.alert('Success', `${selectedDocuments.length} document(s) deleted`);
+                        } catch (error) {
+                            console.error('Bulk delete error:', error);
+                            Alert.alert('Error', 'Failed to delete some documents');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleBulkShare = async () => {
+        if (selectedDocuments.length === 0) return;
+
+        try {
+            const docsToShare = documents.filter(d => selectedDocuments.includes(d.id));
+            const filePaths = [];
+
+            // Download all selected documents
+            for (const doc of docsToShare) {
+                if (!doc.downloadUrl) continue;
+
+                const tempPath = `${RNFS.CachesDirectoryPath}/${doc.name}`;
+                const downloadResult = await RNFS.downloadFile({
+                    fromUrl: doc.downloadUrl,
+                    toFile: tempPath,
+                }).promise;
+
+                if (downloadResult.statusCode === 200) {
+                    filePaths.push(Platform.OS === 'android' ? `file://${tempPath}` : tempPath);
+                }
+            }
+
+            if (filePaths.length > 0) {
+                // Share all files
+                await Share.open({
+                    urls: filePaths,
+                    title: `${filePaths.length} documents`,
+                });
+
+                // Clean up temp files after sharing
+                setTimeout(() => {
+                    filePaths.forEach(path => {
+                        const cleanPath = path.replace('file://', '');
+                        RNFS.unlink(cleanPath).catch(() => { });
+                    });
+                }, 5000);
+            } else {
+                Alert.alert('Error', 'Failed to prepare documents for sharing');
+            }
+        } catch (error) {
+            if (error.message !== 'User did not share') {
+                console.error('Bulk share error:', error);
+                Alert.alert('Error', 'Failed to share documents');
+            }
+        }
     };
 
     const formatFileSize = (bytes) => {
@@ -601,18 +832,53 @@ const CaseDetailsScreen = ({ navigation, route }) => {
                 )}
                 {activeTab === 'documents' && (
                     <>
-                        {/* Upload Document Button */}
-                        <TouchableOpacity
-                            style={styles.addHearingButton}
-                            onPress={handleUploadDocument}
-                            disabled={uploading}
-                        >
-                            {uploading ? (
-                                <ActivityIndicator color="#CD7F32" />
-                            ) : (
-                                <Text style={styles.addHearingText}>+ UPLOAD DOCUMENT</Text>
+                        {/* Upload Document Button and Multi-Select Toggle */}
+                        <View style={styles.documentsHeader}>
+                            <TouchableOpacity
+                                style={[styles.addHearingButton, { flex: 1 }]}
+                                onPress={handleUploadDocument}
+                                disabled={uploading}
+                            >
+                                {uploading ? (
+                                    <ActivityIndicator color="#CD7F32" />
+                                ) : (
+                                    <Text style={styles.addHearingText}>+ UPLOAD DOCUMENT</Text>
+                                )}
+                            </TouchableOpacity>
+                            {documents.length > 0 && (
+                                <TouchableOpacity
+                                    style={[styles.multiSelectButton, multiSelectMode && styles.multiSelectButtonActive]}
+                                    onPress={toggleMultiSelectMode}
+                                >
+                                    <Text style={[styles.multiSelectButtonText, multiSelectMode && { color: '#FFFFFF' }]}>
+                                        {multiSelectMode ? '✓ Select' : '☐ Select'}
+                                    </Text>
+                                </TouchableOpacity>
                             )}
-                        </TouchableOpacity>
+                        </View>
+
+                        {/* Bulk Actions Bar */}
+                        {multiSelectMode && selectedDocuments.length > 0 && (
+                            <View style={styles.bulkActionsBar}>
+                                <Text style={styles.bulkActionsText}>
+                                    {selectedDocuments.length} selected
+                                </Text>
+                                <View style={styles.bulkActionsButtons}>
+                                    <TouchableOpacity
+                                        style={styles.bulkActionButton}
+                                        onPress={handleBulkShare}
+                                    >
+                                        <Text style={styles.bulkActionButtonText}>📤 Share</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.bulkActionButton, styles.bulkDeleteButton]}
+                                        onPress={handleBulkDelete}
+                                    >
+                                        <Text style={styles.bulkActionButtonText}>🗑️ Delete</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        )}
 
                         {/* Documents List */}
                         {documents.length === 0 ? (
@@ -620,25 +886,58 @@ const CaseDetailsScreen = ({ navigation, route }) => {
                                 <Text style={styles.emptyText}>No documents uploaded</Text>
                             </View>
                         ) : (
-                            documents.map((doc) => (
-                                <View key={doc.id} style={styles.documentCard}>
-                                    <View style={styles.documentIcon}>
-                                        <Text style={styles.documentIconText}>📄</Text>
-                                    </View>
-                                    <View style={styles.documentInfo}>
-                                        <Text style={styles.documentName} numberOfLines={1}>{doc.name}</Text>
-                                        <Text style={styles.documentMeta}>
-                                            {formatFileSize(doc.size)} • {doc.createdAt?.toDate ? doc.createdAt.toDate().toLocaleDateString() : 'Just now'}
-                                        </Text>
-                                    </View>
+                            documents.map((doc) => {
+                                const isSelected = selectedDocuments.includes(doc.id);
+                                return (
                                     <TouchableOpacity
-                                        style={styles.deleteDocButton}
-                                        onPress={() => handleDeleteDocument(doc.id, doc.storagePath)}
+                                        key={doc.id}
+                                        style={[styles.documentCard, isSelected && styles.documentCardSelected]}
+                                        onPress={() => multiSelectMode ? toggleDocumentSelection(doc.id) : handleViewDocument(doc)}
+                                        activeOpacity={0.7}
                                     >
-                                        <Text style={styles.deleteDocText}>✕</Text>
+                                        {multiSelectMode && (
+                                            <View style={styles.checkbox}>
+                                                <Text style={styles.checkboxText}>
+                                                    {isSelected ? '✓' : ''}
+                                                </Text>
+                                            </View>
+                                        )}
+                                        <View style={styles.documentIcon}>
+                                            <Text style={styles.documentIconText}>📄</Text>
+                                        </View>
+                                        <View style={styles.documentInfo}>
+                                            <Text style={styles.documentName} numberOfLines={1}>{doc.name}</Text>
+                                            <Text style={styles.documentMeta}>
+                                                {formatFileSize(doc.size)} • {doc.createdAt?.toDate ? doc.createdAt.toDate().toLocaleDateString() : 'Just now'}
+                                            </Text>
+                                        </View>
+
+                                        {/* Action Buttons - Only show when NOT in multi-select mode */}
+                                        {!multiSelectMode && (
+                                            <>
+                                                <TouchableOpacity
+                                                    style={styles.docActionButton}
+                                                    onPress={() => handleViewDocument(doc)}
+                                                >
+                                                    <Text style={styles.docActionText}>👁️</Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    style={styles.docActionButton}
+                                                    onPress={() => handleShareDocument(doc)}
+                                                >
+                                                    <Text style={styles.docActionText}>📤</Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    style={styles.docActionButton}
+                                                    onPress={() => handleDeleteDocument(doc.id, doc.storagePath)}
+                                                >
+                                                    <Text style={styles.docActionText}>🗑️</Text>
+                                                </TouchableOpacity>
+                                            </>
+                                        )}
                                     </TouchableOpacity>
-                                </View>
-                            ))
+                                );
+                            })
                         )}
                     </>
                 )}
@@ -808,6 +1107,8 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#CD7F32',
         borderStyle: 'dashed',
+        height: 56,
+        justifyContent: 'center',
     },
     addHearingText: {
         color: '#CD7F32',
@@ -935,12 +1236,96 @@ const styles = StyleSheet.create({
         color: '#666',
         fontSize: 12,
     },
+    docActionButton: {
+        padding: 6,
+        marginLeft: 0,
+    },
+    docActionText: {
+        fontSize: 18,
+    },
     deleteDocButton: {
         padding: 8,
     },
     deleteDocText: {
         color: '#FF5252',
         fontSize: 16,
+        fontWeight: 'bold',
+    },
+    // Multi-select styles
+    documentsHeader: {
+        flexDirection: 'row',
+        gap: 12,
+        marginBottom: 16,
+    },
+    multiSelectButton: {
+        backgroundColor: '#1E1E1E',
+        borderRadius: 12,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#CD7F32',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: 56,
+    },
+    multiSelectButtonActive: {
+        backgroundColor: '#CD7F32',
+    },
+    multiSelectButtonText: {
+        color: '#CD7F32',
+        fontSize: 14,
+        fontWeight: 'bold',
+    },
+    bulkActionsBar: {
+        backgroundColor: '#CD7F32',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    bulkActionsText: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: 'bold',
+    },
+    bulkActionsButtons: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    bulkActionButton: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 8,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+    },
+    bulkDeleteButton: {
+        backgroundColor: '#FF5252',
+    },
+    bulkActionButtonText: {
+        color: '#121212',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    documentCardSelected: {
+        borderColor: '#CD7F32',
+        borderWidth: 2,
+        backgroundColor: '#2A2520',
+    },
+    checkbox: {
+        width: 28,
+        height: 28,
+        borderRadius: 6,
+        borderWidth: 2,
+        borderColor: '#CD7F32',
+        backgroundColor: '#1E1E1E',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    checkboxText: {
+        color: '#CD7F32',
+        fontSize: 18,
         fontWeight: 'bold',
     },
 });
