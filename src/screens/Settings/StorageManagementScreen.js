@@ -152,6 +152,15 @@ const StorageManagementScreen = ({ navigation }) => {
                         {formatFileSize((stats.maxSizeMB * 1024 * 1024) - stats.totalSize)} available
                     </Text>
                 </View>
+
+                {/* Compression Savings */}
+                {stats.compressionSavings > 0 && (
+                    <View style={styles.compressionRow}>
+                        <Text style={styles.compressionText}>
+                            💾 Compression saved {formatFileSize(stats.compressionSavings)}
+                        </Text>
+                    </View>
+                )}
             </View>
         );
     };
@@ -176,6 +185,7 @@ const StorageManagementScreen = ({ navigation }) => {
                     </View>
                     <Text style={styles.documentAccess}>
                         Accessed {item.accessCount || 0} {item.accessCount === 1 ? 'time' : 'times'}
+                        {item.compressionSavings > 0 && ` • Saved ${formatFileSize(item.compressionSavings)}`}
                     </Text>
                 </View>
 
@@ -343,6 +353,17 @@ const styles = StyleSheet.create({
     statsSubtext: {
         color: '#999',
         fontSize: 12,
+    },
+    compressionRow: {
+        marginTop: 8,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: '#333',
+    },
+    compressionText: {
+        color: '#4CAF50',
+        fontSize: 12,
+        fontWeight: '600',
     },
     clearAllButton: {
         backgroundColor: '#FF5252',

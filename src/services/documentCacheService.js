@@ -14,6 +14,7 @@ import RNFS from 'react-native-fs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import storage from '@react-native-firebase/storage';
 import { Platform } from 'react-native';
+import { Image as ImageCompressor } from 'react-native-compressor';
 import { getMaxCacheSize } from './cacheConfigService';
 import { generateUniqueFilename, formatFileSize } from '../utils/fileUtils';
 
@@ -240,15 +241,51 @@ const downloadAndCache = async (documentId, document) => {
       console.log('✅ [DOWNLOAD] Complete!');
 
       // Verify file size
-      const stats = await RNFS.stat(tempPath);
+      let stats = await RNFS.stat(tempPath);
       console.log('   📊 Downloaded file size:', formatFileSize(stats.size));
 
       if (Math.abs(stats.size - document.size) > 1024) { // Allow 1KB tolerance
         console.warn('⚠️  [Cache] File size mismatch. Expected:', document.size, 'Got:', stats.size);
       }
 
-      // Move to final location
-      await RNFS.moveFile(tempPath, finalPath);
+      // Compress images to save space (WhatsApp-like auto compression)
+      const isImage = document.type?.startsWith('image/') || document.name?.match(/\.(jpg|jpeg|png|webp)$/i);
+      let originalSize = stats.size;
+      let compressedSize = stats.size;
+      let compressionSavings = 0;
+      let fileToMove = tempPath; // Default to temp file
+
+      if (isImage) {
+        try {
+          console.log('🗜️  [COMPRESS] Compressing image...');
+
+          // Auto compress (WhatsApp-like) - compressor handles temp file cleanup
+          const compressedPath = await ImageCompressor.compress(tempPath);
+
+          // Get compressed file size
+          const compressedStats = await RNFS.stat(compressedPath);
+          compressedSize = compressedStats.size;
+          compressionSavings = originalSize - compressedSize;
+          const savingsPercent = ((compressionSavings / originalSize) * 100).toFixed(1);
+
+          console.log('✅ [COMPRESS] Complete!');
+          console.log('   📊 Original:', formatFileSize(originalSize), '→ Compressed:', formatFileSize(compressedSize));
+          console.log('   💾 Saved:', formatFileSize(compressionSavings), `(${savingsPercent}%)`);
+
+          // Use compressed file (compressor already cleaned up temp file)
+          fileToMove = compressedPath;
+          stats = compressedStats; // Update stats to compressed file
+        } catch (compressionError) {
+          console.warn('⚠️  [COMPRESS] Compression failed, using original file:', compressionError.message);
+          // Continue with original file
+          compressedSize = originalSize;
+          compressionSavings = 0;
+          fileToMove = tempPath;
+        }
+      }
+
+      // Move to final location (either compressed or original file)
+      await RNFS.moveFile(fileToMove, finalPath);
       console.log('📂 [CACHE] Saved to:', finalPath);
 
       // Update cache index
@@ -258,7 +295,9 @@ const downloadAndCache = async (documentId, document) => {
         userId,
         name: document.name,
         type: document.type,
-        size: stats.size, // Use actual size
+        size: stats.size, // Actual size (compressed if image)
+        originalSize: originalSize, // Original download size
+        compressionSavings: compressionSavings, // Bytes saved through compression
         localPath: finalPath,
         downloadUrl: document.downloadUrl,
         storagePath: document.storagePath,
@@ -278,9 +317,17 @@ const downloadAndCache = async (documentId, document) => {
       return finalPath;
     } catch (error) {
       console.error('[Cache] Download error:', error);
-      // Cleanup temp file if exists
-      const tempPath = `${CACHE_ROOT}/temp_${generateUniqueFilename(document.name)}`;
-      await RNFS.unlink(tempPath).catch(() => {});
+      // Cleanup temp files if they exist (both original and compressed)
+      try {
+        const tempFiles = await RNFS.readDir(CACHE_ROOT);
+        for (const file of tempFiles) {
+          if (file.name.startsWith('temp_')) {
+            await RNFS.unlink(file.path).catch(() => {});
+          }
+        }
+      } catch (cleanupError) {
+        console.warn('[Cache] Cleanup error:', cleanupError);
+      }
       throw error;
     } finally {
       // Remove from download queue
@@ -362,7 +409,7 @@ export const isDocumentCached = async (documentId) => {
 /**
  * Get cache statistics
  *
- * @returns {Promise<object>} - { totalSize, totalSizeMB, documentCount, maxSizeMB, percentUsed }
+ * @returns {Promise<object>} - { totalSize, totalSizeMB, documentCount, maxSizeMB, percentUsed, compressionSavings, compressionSavingsMB }
  */
 export const getCacheStats = async () => {
   if (!_cacheIndex) {
@@ -373,12 +420,24 @@ export const getCacheStats = async () => {
   const totalSizeMB = _cacheIndex.totalSize / BYTES_PER_MB;
   const percentUsed = (totalSizeMB / maxSizeMB) * 100;
 
+  // Calculate total compression savings
+  let totalCompressionSavings = 0;
+  for (const doc of Object.values(_cacheIndex.documents)) {
+    if (doc.compressionSavings) {
+      totalCompressionSavings += doc.compressionSavings;
+    }
+  }
+
+  const compressionSavingsMB = totalCompressionSavings / BYTES_PER_MB;
+
   return {
     totalSize: _cacheIndex.totalSize,
     totalSizeMB: parseFloat(totalSizeMB.toFixed(2)),
     documentCount: _cacheIndex.documentCount,
     maxSizeMB,
     percentUsed: parseFloat(percentUsed.toFixed(1)),
+    compressionSavings: totalCompressionSavings,
+    compressionSavingsMB: parseFloat(compressionSavingsMB.toFixed(2)),
   };
 };
 
