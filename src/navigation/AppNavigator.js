@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { ActivityIndicator, View, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, View, StyleSheet, Text, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { onAuthStateChanged } from '../services/authService';
 import LoginScreen from '../screens/Auth/LoginScreen';
 import GetAccessScreen from '../screens/Auth/GetAccessScreen';
@@ -75,6 +76,9 @@ const PlaceholderScreen = () => (
 
 // Bottom Tab Navigator for main app screens
 const MainTabs = () => {
+    const insets = useSafeAreaInsets();
+    const bottomPadding = Platform.OS === 'android' ? Math.max(insets.bottom, 10) : insets.bottom;
+
     return (
         <Tab.Navigator
             screenOptions={{
@@ -83,8 +87,8 @@ const MainTabs = () => {
                     backgroundColor: '#1E1E1E',
                     borderTopColor: '#333',
                     borderTopWidth: 1,
-                    height: 60,
-                    paddingBottom: 8,
+                    height: 60 + bottomPadding,
+                    paddingBottom: 8 + bottomPadding,
                     paddingTop: 8,
                 },
                 tabBarActiveTintColor: '#CD7F32',
