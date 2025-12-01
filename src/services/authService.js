@@ -34,7 +34,25 @@ export const signUp = async (email, password, userData) => {
 export const signIn = async (email, password) => {
     try {
         const userCredential = await auth().signInWithEmailAndPassword(email, password);
-        return { success: true, user: userCredential.user };
+        const user = userCredential.user;
+
+        // Check if user is allowed to access the app
+        const userDoc = await firestore().collection('users').doc(user.uid).get();
+
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            // If isAllowed field exists and is false, deny access
+            if (userData.isAllowed === false) {
+                // Sign out the user
+                await auth().signOut();
+                return {
+                    success: false,
+                    error: 'Your access has been restricted. Please contact support.'
+                };
+            }
+        }
+
+        return { success: true, user };
     } catch (error) {
         console.error('Error signing in:', error);
         let errorMessage = 'Failed to sign in';
