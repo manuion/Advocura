@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DatePicker from 'react-native-date-picker';
 import { subscribeToCases } from '../../services/casesService';
-import { getHearingsByDate } from '../../services/hearingsService';
+import { subscribeToHearingsByDate } from '../../services/hearingsService';
 import { getCurrentUser, getUserProfile } from '../../services/authService';
 
 const DashboardScreen = ({ navigation }) => {
@@ -25,16 +25,14 @@ const DashboardScreen = ({ navigation }) => {
 
 
     useEffect(() => {
-        fetchHearings();
-    }, [selectedDate]);
-
-    const fetchHearings = async () => {
-        setHearingsLoading(true);
         const user = getCurrentUser();
-        if (user) {
-            const result = await getHearingsByDate(user.uid, selectedDate);
-            if (result.success) {
+        if (!user) return;
 
+        setHearingsLoading(true);
+
+        // Subscribe to real-time hearing updates for the selected date
+        const unsubscribeHearings = subscribeToHearingsByDate(user.uid, selectedDate, async (result) => {
+            if (result.success) {
                 // Fetch case details for each hearing to get case title and client name
                 const formattedHearingsPromises = result.hearings.map(async (h) => {
                     const hearingDate = h.date?.toDate ? h.date.toDate() : h.date;
@@ -75,12 +73,16 @@ const DashboardScreen = ({ navigation }) => {
 
                 const formattedHearings = await Promise.all(formattedHearingsPromises);
                 setTodaysHearings(formattedHearings);
-            } else {
-                console.error('Error fetching hearings:', result.error);
             }
-        }
-        setHearingsLoading(false);
-    };
+            setHearingsLoading(false);
+        });
+
+        return () => {
+            if (unsubscribeHearings) {
+                unsubscribeHearings();
+            }
+        };
+    }, [selectedDate]);
 
     useEffect(() => {
         // Get current user

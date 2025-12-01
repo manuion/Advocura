@@ -195,3 +195,42 @@ export const subscribeToCaseHearings = (userId, caseId, callback) => {
         return () => { };
     }
 };
+
+// Subscribe to hearings for a specific date (real-time updates)
+export const subscribeToHearingsByDate = (userId, date, callback) => {
+    try {
+        // Create start and end of the day
+        const startOfDay = new Date(date);
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const endOfDay = new Date(date);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        const unsubscribe = firestore()
+            .collection('users')
+            .doc(userId)
+            .collection('hearings')
+            .where('date', '>=', startOfDay)
+            .where('date', '<=', endOfDay)
+            .orderBy('date', 'asc')
+            .onSnapshot(
+                (snapshot) => {
+                    const hearings = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data(),
+                    }));
+                    callback({ success: true, hearings });
+                },
+                (error) => {
+                    console.error('Error in hearings date subscription:', error);
+                    callback({ success: false, error: error.message, hearings: [] });
+                }
+            );
+
+        return unsubscribe;
+    } catch (error) {
+        console.error('Error setting up hearings date subscription:', error);
+        callback({ success: false, error: error.message, hearings: [] });
+        return () => { };
+    }
+};
