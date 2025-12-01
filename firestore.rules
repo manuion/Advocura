@@ -16,30 +16,23 @@ service cloud.firestore {
     // Users collection - users can only read/write their own profile
     match /users/{userId} {
       allow read, write: if isOwner(userId);
-    }
 
-    // Cases collection - users can only access their own cases
-    match /cases/{caseId} {
-      allow read, write: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-    }
+      // Subcollections under users - accessible only by the user
+      match /clients/{clientId} {
+        allow read, write, create, delete: if isOwner(userId);
+      }
 
-    // Clients collection - users can only access their own clients
-    match /clients/{clientId} {
-      allow read, write: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-    }
+      match /cases/{caseId} {
+        allow read, write, create, delete: if isOwner(userId);
+      }
 
-    // Documents collection - users can only access their own documents
-    match /documents/{documentId} {
-      allow read, write: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-    }
+      match /documents/{documentId} {
+        allow read, write, create, delete: if isOwner(userId);
+      }
 
-    // Hearings collection - users can only access their own hearings
-    match /hearings/{hearingId} {
-      allow read, write: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      match /hearings/{hearingId} {
+        allow read, write, create, delete: if isOwner(userId);
+      }
     }
 
     // Config collection - read-only for authenticated users
