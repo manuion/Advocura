@@ -1,0 +1,17 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Only allow authenticated users to access storage
+    match /{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
+
+    // User-specific document uploads
+    // Path structure: documents/user_{userId}/{documentId}
+    match /documents/user_{userId}/{document=**} {
+      // Users can only access their own documents
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
