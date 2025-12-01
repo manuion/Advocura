@@ -113,7 +113,8 @@ const AddCaseScreen = ({ navigation, route }) => {
 
     const handleNavigateToAddClient = () => {
         setShowClientPicker(false);
-        navigation.navigate('AddClient');
+        // Navigate to Clients tab, then to AddClient screen within that stack
+        navigation.getParent().navigate('Clients', { screen: 'AddClient' });
     };
 
     const handleSave = async () => {

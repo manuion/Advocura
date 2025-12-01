@@ -155,7 +155,10 @@ const AppNavigator = () => {
             <Stack.Navigator screenOptions={{ headerShown: false }}>
                 {user ? (
                     // User is logged in - show main app
-                    <Stack.Screen name="Main" component={MainTabs} />
+                    <>
+                        <Stack.Screen name="Main" component={MainTabs} />
+                        <Stack.Screen name="Search" component={SearchScreen} />
+                    </>
                 ) : (
                     // User is not logged in - show auth screens
                     <>
