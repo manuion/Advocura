@@ -47,36 +47,28 @@ const AddCaseScreen = ({ navigation, route }) => {
         loadClients();
     }, []);
 
-    // Clear form when screen gains focus (unless in edit mode or receiving client from AddClient)
+    // Refresh clients when screen comes into focus
+    // Also clear form if not in edit mode and no selectedClient param
     useFocusEffect(
         React.useCallback(() => {
-            // Don't clear if in edit mode
-            if (isEditMode) {
-                return;
-            }
-
-            // Don't clear if we're receiving a client selection from AddClient
-            if (route.params?.selectedClientId) {
-                return;
-            }
-
-            // Clear all form fields
-            setCaseNumber('');
-            setTitle('');
-            setDescription('');
-            setSelectedClient(null);
-            setCourtName('');
-            setJudgeName('');
-            setCaseType('Civil');
-            setStatus('Active');
-            setFilingDate(new Date());
-            setNextHearingDate(null);
-            setNextHearingTime(null);
-            setClientSearch('');
-            setQuickAddClientName('');
-
-            // Refresh clients list
             loadClients();
+
+            // Clear form only if we're starting fresh (not edit mode, no client being passed back)
+            if (!isEditMode && !route.params?.selectedClientId) {
+                setCaseNumber('');
+                setTitle('');
+                setDescription('');
+                setSelectedClient(null);
+                setCourtName('');
+                setJudgeName('');
+                setCaseType('Civil');
+                setStatus('Active');
+                setFilingDate(new Date());
+                setNextHearingDate(null);
+                setNextHearingTime(null);
+                setClientSearch('');
+                setQuickAddClientName('');
+            }
         }, [isEditMode, route.params?.selectedClientId])
     );
 
@@ -223,7 +215,8 @@ const AddCaseScreen = ({ navigation, route }) => {
                     text1: 'Success',
                     text2: `Case ${isEditMode ? 'updated' : 'created'} successfully!`
                 });
-                navigation.goBack();
+                // Navigate back to CasesList (the root of CasesStack)
+                navigation.navigate('CasesList');
             } else {
                 Toast.show({ type: 'error', text1: 'Error', text2: result.error || 'Failed to save case' });
             }
