@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { CommonActions } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 import { createClient, updateClient, getClientById } from '../../services/clientsService';
 import { getCurrentUser } from '../../services/authService';
@@ -98,14 +98,25 @@ const AddClientScreen = ({ navigation, route }) => {
             // If we came from AddCase, navigate back to Cases tab with the new client
             if (fromAddCase && !isEditMode) {
                 const newClientId = result.clientId;
-                // Navigate back to Cases tab -> AddCase screen with new client selected
-                navigation.getParent()?.navigate('Cases', {
-                    screen: 'AddCase',
-                    params: {
-                        selectedClientId: newClientId,
-                        selectedClientName: name.trim()
-                    }
-                });
+
+                // First, reset Clients stack to ClientsList so it doesn't stay on AddClient
+                navigation.dispatch(
+                    CommonActions.reset({
+                        index: 0,
+                        routes: [{ name: 'ClientsList' }],
+                    })
+                );
+
+                // Then navigate to Cases tab -> AddCase screen with new client selected
+                setTimeout(() => {
+                    navigation.getParent()?.navigate('Cases', {
+                        screen: 'AddCase',
+                        params: {
+                            selectedClientId: newClientId,
+                            selectedClientName: name.trim()
+                        }
+                    });
+                }, 0);
             } else {
                 // Navigate back to ClientsList explicitly
                 navigation.navigate('ClientsList');
