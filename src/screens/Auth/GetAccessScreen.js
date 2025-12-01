@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StatusBar, StyleSheet, ScrollV
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { signUp } from '../../services/authService';
+import { validateEmail, validateOptionalPhone, validatePassword, formatPhoneNumber } from '../../utils/validation';
 
 const GetAccessScreen = ({ navigation }) => {
     const [fullName, setFullName] = useState('');
@@ -13,14 +14,30 @@ const GetAccessScreen = ({ navigation }) => {
     const [loading, setLoading] = useState(false);
 
     const handleSubmit = async () => {
-        // Validation
-        if (!fullName || !email || !password) {
-            Toast.show({ type: 'error', text1: 'Error', text2: 'Please fill in all required fields' });
+        // Validate name
+        if (!fullName || !fullName.trim()) {
+            Toast.show({ type: 'error', text1: 'Error', text2: 'Please enter your full name' });
             return;
         }
 
-        if (password.length < 6) {
-            Toast.show({ type: 'error', text1: 'Error', text2: 'Password must be at least 6 characters' });
+        // Validate email
+        const emailValidation = validateEmail(email);
+        if (!emailValidation.isValid) {
+            Toast.show({ type: 'error', text1: 'Invalid Email', text2: emailValidation.error });
+            return;
+        }
+
+        // Validate password
+        const passwordValidation = validatePassword(password);
+        if (!passwordValidation.isValid) {
+            Toast.show({ type: 'error', text1: 'Invalid Password', text2: passwordValidation.error });
+            return;
+        }
+
+        // Validate phone (if provided)
+        const phoneValidation = validateOptionalPhone(phone);
+        if (!phoneValidation.isValid) {
+            Toast.show({ type: 'error', text1: 'Invalid Phone', text2: phoneValidation.error });
             return;
         }
 
@@ -106,7 +123,7 @@ const GetAccessScreen = ({ navigation }) => {
                             placeholder="9876543210"
                             placeholderTextColor="#555"
                             value={phone}
-                            onChangeText={setPhone}
+                            onChangeText={(text) => setPhone(formatPhoneNumber(text))}
                             keyboardType="phone-pad"
                             maxLength={10}
                         />

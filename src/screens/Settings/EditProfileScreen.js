@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { getCurrentUser, getUserProfile, updateUserProfile } from '../../services/authService';
+import { validateOptionalPhone, formatPhoneNumber } from '../../utils/validation';
 
 const EditProfileScreen = ({ navigation }) => {
     const [loading, setLoading] = useState(false);
@@ -31,6 +32,13 @@ const EditProfileScreen = ({ navigation }) => {
     const handleSave = async () => {
         if (!name.trim()) {
             Toast.show({ type: 'error', text1: 'Error', text2: 'Name is required' });
+            return;
+        }
+
+        // Validate phone (if provided)
+        const phoneValidation = validateOptionalPhone(phone);
+        if (!phoneValidation.isValid) {
+            Toast.show({ type: 'error', text1: 'Invalid Phone', text2: phoneValidation.error });
             return;
         }
 
@@ -98,7 +106,7 @@ const EditProfileScreen = ({ navigation }) => {
                     <TextInput
                         style={styles.input}
                         value={phone}
-                        onChangeText={setPhone}
+                        onChangeText={(text) => setPhone(formatPhoneNumber(text))}
                         placeholder="9876543210"
                         placeholderTextColor="#555"
                         keyboardType="phone-pad"

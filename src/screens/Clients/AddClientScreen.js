@@ -5,6 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 import { createClient, updateClient, getClientById } from '../../services/clientsService';
 import { getCurrentUser } from '../../services/authService';
+import { validateOptionalEmail, validateOptionalPhone, formatPhoneNumber } from '../../utils/validation';
 
 const AddClientScreen = ({ navigation, route }) => {
     const isEditMode = route?.params?.clientId;
@@ -52,8 +53,23 @@ const AddClientScreen = ({ navigation, route }) => {
     };
 
     const handleSave = async () => {
+        // Validate name
         if (!name.trim()) {
             Toast.show({ type: 'error', text1: 'Error', text2: 'Please enter client name' });
+            return;
+        }
+
+        // Validate email (if provided)
+        const emailValidation = validateOptionalEmail(email);
+        if (!emailValidation.isValid) {
+            Toast.show({ type: 'error', text1: 'Invalid Email', text2: emailValidation.error });
+            return;
+        }
+
+        // Validate phone (if provided)
+        const phoneValidation = validateOptionalPhone(phone);
+        if (!phoneValidation.isValid) {
+            Toast.show({ type: 'error', text1: 'Invalid Phone', text2: phoneValidation.error });
             return;
         }
 
@@ -151,7 +167,7 @@ const AddClientScreen = ({ navigation, route }) => {
                         placeholder="9876543210"
                         placeholderTextColor="#555"
                         value={phone}
-                        onChangeText={setPhone}
+                        onChangeText={(text) => setPhone(formatPhoneNumber(text))}
                         keyboardType="phone-pad"
                         maxLength={10}
                     />
