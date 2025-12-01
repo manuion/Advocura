@@ -54,6 +54,21 @@ const AddCaseScreen = ({ navigation, route }) => {
         }, [])
     );
 
+    // Handle returned client from AddClient screen
+    useEffect(() => {
+        if (route.params?.selectedClientId && route.params?.selectedClientName) {
+            setSelectedClient({
+                id: route.params.selectedClientId,
+                name: route.params.selectedClientName
+            });
+            // Clear the params to avoid reapplying on future focus
+            navigation.setParams({
+                selectedClientId: undefined,
+                selectedClientName: undefined
+            });
+        }
+    }, [route.params?.selectedClientId, route.params?.selectedClientName]);
+
     useEffect(() => {
         if (clientSearch.trim() === '') {
             setFilteredClients(clients);
@@ -114,7 +129,10 @@ const AddCaseScreen = ({ navigation, route }) => {
     const handleNavigateToAddClient = () => {
         setShowClientPicker(false);
         // Navigate to Clients tab, then to AddClient screen within that stack
-        navigation.getParent().navigate('Clients', { screen: 'AddClient' });
+        navigation.getParent().navigate('Clients', {
+            screen: 'AddClient',
+            params: { fromAddCase: true }
+        });
     };
 
     const handleSave = async () => {

@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 import { createClient, updateClient, getClientById } from '../../services/clientsService';
 import { getCurrentUser } from '../../services/authService';
 
 const AddClientScreen = ({ navigation, route }) => {
     const isEditMode = route?.params?.clientId;
+    const fromAddCase = route?.params?.fromAddCase; // Check if navigated from AddCase
     const [loading, setLoading] = useState(false);
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
@@ -14,6 +16,20 @@ const AddClientScreen = ({ navigation, route }) => {
     const [company, setCompany] = useState('');
     const [address, setAddress] = useState('');
     const [notes, setNotes] = useState('');
+
+    // Clear form when screen gains focus (unless in edit mode)
+    useFocusEffect(
+        React.useCallback(() => {
+            if (!isEditMode) {
+                setName('');
+                setEmail('');
+                setPhone('');
+                setCompany('');
+                setAddress('');
+                setNotes('');
+            }
+        }, [isEditMode])
+    );
 
     useEffect(() => {
         if (isEditMode) {
@@ -68,7 +84,21 @@ const AddClientScreen = ({ navigation, route }) => {
                 text1: 'Success',
                 text2: `Client ${isEditMode ? 'updated' : 'created'} successfully!`
             });
-            navigation.goBack();
+
+            // If we came from AddCase, navigate back to Cases tab with the new client
+            if (fromAddCase && !isEditMode) {
+                const newClientId = result.clientId;
+                // Navigate back to Cases tab -> AddCase screen with new client selected
+                navigation.getParent()?.navigate('Cases', {
+                    screen: 'AddCase',
+                    params: {
+                        selectedClientId: newClientId,
+                        selectedClientName: name.trim()
+                    }
+                });
+            } else {
+                navigation.goBack();
+            }
         } else {
             Toast.show({ type: 'error', text1: 'Error', text2: result.error || 'Failed to save client' });
         }
