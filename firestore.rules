@@ -13,9 +13,19 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Users collection - users can only read/write their own profile
+    // Helper function to check if user is an admin
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Users collection
     match /users/{userId} {
+      // Users can read/write their own profile
       allow read, write: if isOwner(userId);
+
+      // Admins can read all users and update any user (for block/unblock)
+      allow read, update: if isAdmin();
 
       // Subcollections under users - accessible only by the user
       match /clients/{clientId} {
