@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityInd
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { signIn } from '../../services/authService';
+import { validateEmail } from '../../utils/validation';
 
 const LoginScreen = ({ navigation }) => {
     const [email, setEmail] = useState('');
@@ -10,9 +11,16 @@ const LoginScreen = ({ navigation }) => {
     const [loading, setLoading] = useState(false);
 
     const handleLogin = async () => {
-        // Validation
-        if (!email || !password) {
-            Toast.show({ type: 'error', text1: 'Error', text2: 'Please enter both email and password' });
+        // Validate email
+        const emailValidation = validateEmail(email);
+        if (!emailValidation.isValid) {
+            Toast.show({ type: 'error', text1: 'Invalid Email', text2: emailValidation.error });
+            return;
+        }
+
+        // Validate password
+        if (!password || !password.trim()) {
+            Toast.show({ type: 'error', text1: 'Error', text2: 'Please enter your password' });
             return;
         }
 

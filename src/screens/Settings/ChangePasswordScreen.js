@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-nativ
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import auth from '@react-native-firebase/auth';
+import { validatePassword } from '../../utils/validation';
 
 const ChangePasswordScreen = ({ navigation }) => {
     const [loading, setLoading] = useState(false);
@@ -11,18 +12,22 @@ const ChangePasswordScreen = ({ navigation }) => {
     const [confirmPassword, setConfirmPassword] = useState('');
 
     const handleChangePassword = async () => {
-        if (!currentPassword || !newPassword || !confirmPassword) {
-            Toast.show({ type: 'error', text1: 'Error', text2: 'Please fill in all fields' });
+        // Validate current password
+        if (!currentPassword || !currentPassword.trim()) {
+            Toast.show({ type: 'error', text1: 'Error', text2: 'Please enter your current password' });
             return;
         }
 
+        // Validate new password
+        const newPasswordValidation = validatePassword(newPassword);
+        if (!newPasswordValidation.isValid) {
+            Toast.show({ type: 'error', text1: 'Invalid Password', text2: newPasswordValidation.error });
+            return;
+        }
+
+        // Confirm password match
         if (newPassword !== confirmPassword) {
             Toast.show({ type: 'error', text1: 'Error', text2: 'New passwords do not match' });
-            return;
-        }
-
-        if (newPassword.length < 6) {
-            Toast.show({ type: 'error', text1: 'Error', text2: 'Password must be at least 6 characters long' });
             return;
         }
 

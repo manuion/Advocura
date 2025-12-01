@@ -3,14 +3,17 @@ import { View, Text, TextInput, TouchableOpacity, StatusBar, StyleSheet } from '
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { resetPassword } from '../../services/authService';
+import { validateEmail } from '../../utils/validation';
 
 const ForgotPasswordScreen = ({ navigation }) => {
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
 
     const handleResetPassword = async () => {
-        if (!email) {
-            Toast.show({ type: 'error', text1: 'Error', text2: 'Please enter your email address' });
+        // Validate email
+        const emailValidation = validateEmail(email);
+        if (!emailValidation.isValid) {
+            Toast.show({ type: 'error', text1: 'Invalid Email', text2: emailValidation.error });
             return;
         }
 
