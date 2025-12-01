@@ -47,11 +47,37 @@ const AddCaseScreen = ({ navigation, route }) => {
         loadClients();
     }, []);
 
-    // Refresh clients when screen comes into focus (e.g., returning from Add Client screen)
+    // Clear form when screen gains focus (unless in edit mode or receiving client from AddClient)
     useFocusEffect(
         React.useCallback(() => {
+            // Don't clear if in edit mode
+            if (isEditMode) {
+                return;
+            }
+
+            // Don't clear if we're receiving a client selection from AddClient
+            if (route.params?.selectedClientId) {
+                return;
+            }
+
+            // Clear all form fields
+            setCaseNumber('');
+            setTitle('');
+            setDescription('');
+            setSelectedClient(null);
+            setCourtName('');
+            setJudgeName('');
+            setCaseType('Civil');
+            setStatus('Active');
+            setFilingDate(new Date());
+            setNextHearingDate(null);
+            setNextHearingTime(null);
+            setClientSearch('');
+            setQuickAddClientName('');
+
+            // Refresh clients list
             loadClients();
-        }, [])
+        }, [isEditMode, route.params?.selectedClientId])
     );
 
     // Handle returned client from AddClient screen
