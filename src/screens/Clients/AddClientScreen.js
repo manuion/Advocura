@@ -18,25 +18,19 @@ const AddClientScreen = ({ navigation, route }) => {
     const [address, setAddress] = useState('');
     const [notes, setNotes] = useState('');
 
-    // Clear form when screen gains focus (unless in edit mode)
-    useFocusEffect(
-        React.useCallback(() => {
-            if (!isEditMode) {
-                setName('');
-                setEmail('');
-                setPhone('');
-                setCompany('');
-                setAddress('');
-                setNotes('');
-            }
-        }, [isEditMode])
-    );
-
     useEffect(() => {
         if (isEditMode) {
             loadClient();
+        } else {
+            // Clear form only when component mounts in add mode
+            setName('');
+            setEmail('');
+            setPhone('');
+            setCompany('');
+            setAddress('');
+            setNotes('');
         }
-    }, [isEditMode]);
+    }, []);
 
     const loadClient = async () => {
         const user = getCurrentUser();
@@ -113,7 +107,8 @@ const AddClientScreen = ({ navigation, route }) => {
                     }
                 });
             } else {
-                navigation.goBack();
+                // Navigate back to ClientsList explicitly
+                navigation.navigate('ClientsList');
             }
         } else {
             Toast.show({ type: 'error', text1: 'Error', text2: result.error || 'Failed to save client' });
