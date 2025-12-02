@@ -130,44 +130,35 @@ const EmailViewerScreen = ({ navigation, route }) => {
                 return;
             }
 
-            // Save to downloads
-            const downloadPath = `${RNFS.DownloadDirectoryPath}/${attachment.filename}`;
+            // Save to cache directory (always accessible)
+            const downloadPath = `${RNFS.CachesDirectoryPath}/${attachment.filename}`;
             await RNFS.writeFile(downloadPath, result.data, 'base64');
 
             Toast.show({
                 type: 'success',
                 text1: 'Downloaded',
-                text2: `Saved to Downloads: ${attachment.filename}`,
+                text2: attachment.filename,
             });
 
-            // Offer to open/share
-            Alert.alert(
-                'Attachment Downloaded',
-                `${attachment.filename} has been saved to Downloads`,
-                [
-                    { text: 'OK', style: 'cancel' },
-                    {
-                        text: 'Share',
-                        onPress: () => {
-                            Share.open({
-                                url: `file://${downloadPath}`,
-                                title: attachment.filename,
-                            }).catch(() => {});
-                        },
-                    },
-                ]
-            );
+            // Directly open share dialog
+            Share.open({
+                url: `file://${downloadPath}`,
+                title: attachment.filename,
+                filename: attachment.filename,
+            }).catch(() => {});
+
         } catch (error) {
             console.error('Download error:', error);
             Toast.show({
                 type: 'error',
                 text1: 'Download Failed',
-                text2: error.message,
+                text2: error.message || 'Could not download attachment',
             });
         } finally {
             setDownloadingAttachment(null);
         }
     };
+
 
     const formatFileSize = (bytes) => {
         if (!bytes) return '';
