@@ -472,9 +472,19 @@ export const downloadAttachment = async (accountEmail, messageId, attachmentId) 
             `/messages/${messageId}/attachments/${attachmentId}`
         );
 
+        // Convert URL-safe base64 to standard base64
+        let base64Data = result.data;
+        if (base64Data) {
+            base64Data = base64Data.replace(/-/g, '+').replace(/_/g, '/');
+            // Add padding if needed
+            while (base64Data.length % 4) {
+                base64Data += '=';
+            }
+        }
+
         return {
             success: true,
-            data: result.data, // Base64 encoded
+            data: base64Data,
             size: result.size,
         };
     } catch (error) {

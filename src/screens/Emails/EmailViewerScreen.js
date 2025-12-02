@@ -120,7 +120,7 @@ const EmailViewerScreen = ({ navigation, route }) => {
                 type: 'info',
                 text1: 'Opening...',
                 text2: attachment.filename,
-                visibilityTime: 1500,
+                visibilityTime: 2000,
             });
 
             const result = await downloadAttachment(
@@ -138,31 +138,58 @@ const EmailViewerScreen = ({ navigation, route }) => {
                 return;
             }
 
+            if (!result.data) {
+                Toast.show({
+                    type: 'error',
+                    text1: 'Download Failed',
+                    text2: 'No data received',
+                });
+                return;
+            }
+
             // Save to cache directory
             const filePath = `${RNFS.CachesDirectoryPath}/${attachment.filename}`;
             await RNFS.writeFile(filePath, result.data, 'base64');
 
+            // Verify file was written
+            const fileExists = await RNFS.exists(filePath);
+            if (!fileExists) {
+                Toast.show({
+                    type: 'error',
+                    text1: 'Error',
+                    text2: 'Failed to save file',
+                });
+                return;
+            }
+
             // Open file in native viewer
-            await FileViewer.open(filePath, {
-                showOpenWithDialog: true,
-                showAppsSuggestions: true,
-            });
+            await FileViewer.open(filePath);
 
         } catch (error) {
             console.error('Open attachment error:', error);
 
-            // If no app found to open, offer to share instead
-            if (error.message?.includes('No app')) {
-                const filePath = `${RNFS.CachesDirectoryPath}/${attachment.filename}`;
+            // If FileViewer fails, show share dialog as fallback
+            const filePath = `${RNFS.CachesDirectoryPath}/${attachment.filename}`;
+            const fileExists = await RNFS.exists(filePath);
+
+            if (fileExists) {
+                // File exists, offer to share/save
                 Share.open({
                     url: `file://${filePath}`,
                     title: attachment.filename,
-                }).catch(() => {});
+                    type: attachment.mimeType || '*/*',
+                }).catch(() => {
+                    Toast.show({
+                        type: 'error',
+                        text1: 'Could not open file',
+                        text2: 'No app available to open this file type',
+                    });
+                });
             } else {
                 Toast.show({
                     type: 'error',
                     text1: 'Could not open file',
-                    text2: error.message || 'Unknown error',
+                    text2: String(error.message || error).substring(0, 50),
                 });
             }
         } finally {
