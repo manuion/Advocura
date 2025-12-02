@@ -33,13 +33,24 @@ export const linkGmailAccount = async () => {
         await GoogleSignin.hasPlayServices();
 
         // Sign in with Google
-        const userInfo = await GoogleSignin.signIn();
+        const response = await GoogleSignin.signIn();
+        console.log('Google Sign-In response:', JSON.stringify(response, null, 2));
+
+        // Handle different response formats (v10+ vs older versions)
+        const userInfo = response.data || response;
+        const user = userInfo.user || userInfo;
+
+        if (!user || !user.email) {
+            console.error('Invalid user data:', user);
+            return { success: false, error: 'Could not get user email from Google' };
+        }
+
         const tokens = await GoogleSignin.getTokens();
 
         const gmailAccount = {
-            email: userInfo.user.email,
-            name: userInfo.user.name,
-            photo: userInfo.user.photo,
+            email: user.email,
+            name: user.name || user.givenName || '',
+            photo: user.photo || '',
             accessToken: tokens.accessToken,
             idToken: tokens.idToken,
             linkedAt: firestore.FieldValue.serverTimestamp(),
