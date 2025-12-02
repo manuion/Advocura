@@ -16,6 +16,7 @@ import { getEmailById, markAsRead, downloadAttachment } from '../../services/gma
 import { cacheEmail, getCachedEmail } from '../../services/emailCacheService';
 import RNFS from 'react-native-fs';
 import Share from 'react-native-share';
+import FileViewer from 'react-native-file-viewer';
 
 const EmailViewerScreen = ({ navigation, route }) => {
     const { email: emailSummary, caseData } = route.params;
@@ -111,9 +112,16 @@ const EmailViewerScreen = ({ navigation, route }) => {
         });
     };
 
-    const handleDownloadAttachment = async (attachment) => {
+    const handleOpenAttachment = async (attachment) => {
         try {
             setDownloadingAttachment(attachment.id);
+
+            Toast.show({
+                type: 'info',
+                text1: 'Opening...',
+                text2: attachment.filename,
+                visibilityTime: 1500,
+            });
 
             const result = await downloadAttachment(
                 email.accountEmail,
@@ -130,30 +138,33 @@ const EmailViewerScreen = ({ navigation, route }) => {
                 return;
             }
 
-            // Save to cache directory (always accessible)
-            const downloadPath = `${RNFS.CachesDirectoryPath}/${attachment.filename}`;
-            await RNFS.writeFile(downloadPath, result.data, 'base64');
+            // Save to cache directory
+            const filePath = `${RNFS.CachesDirectoryPath}/${attachment.filename}`;
+            await RNFS.writeFile(filePath, result.data, 'base64');
 
-            Toast.show({
-                type: 'success',
-                text1: 'Downloaded',
-                text2: attachment.filename,
+            // Open file in native viewer
+            await FileViewer.open(filePath, {
+                showOpenWithDialog: true,
+                showAppsSuggestions: true,
             });
-
-            // Directly open share dialog
-            Share.open({
-                url: `file://${downloadPath}`,
-                title: attachment.filename,
-                filename: attachment.filename,
-            }).catch(() => {});
 
         } catch (error) {
-            console.error('Download error:', error);
-            Toast.show({
-                type: 'error',
-                text1: 'Download Failed',
-                text2: error.message || 'Could not download attachment',
-            });
+            console.error('Open attachment error:', error);
+
+            // If no app found to open, offer to share instead
+            if (error.message?.includes('No app')) {
+                const filePath = `${RNFS.CachesDirectoryPath}/${attachment.filename}`;
+                Share.open({
+                    url: `file://${filePath}`,
+                    title: attachment.filename,
+                }).catch(() => {});
+            } else {
+                Toast.show({
+                    type: 'error',
+                    text1: 'Could not open file',
+                    text2: error.message || 'Unknown error',
+                });
+            }
         } finally {
             setDownloadingAttachment(null);
         }
@@ -295,7 +306,7 @@ const EmailViewerScreen = ({ navigation, route }) => {
                             <TouchableOpacity
                                 key={attachment.id || index}
                                 style={styles.attachmentItem}
-                                onPress={() => handleDownloadAttachment(attachment)}
+                                onPress={() => handleOpenAttachment(attachment)}
                                 disabled={downloadingAttachment === attachment.id}
                             >
                                 <Text style={styles.attachmentIcon}>📎</Text>
