@@ -32,7 +32,14 @@ export const linkGmailAccount = async () => {
         // Check if Google Play Services are available
         await GoogleSignin.hasPlayServices();
 
-        // Sign in with Google
+        // Sign out first to allow picking a different account
+        try {
+            await GoogleSignin.signOut();
+        } catch (e) {
+            // Ignore sign out errors
+        }
+
+        // Sign in with Google - will show account picker
         const response = await GoogleSignin.signIn();
         console.log('Google Sign-In response:', JSON.stringify(response, null, 2));
 
