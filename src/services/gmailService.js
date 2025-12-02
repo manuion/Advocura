@@ -53,7 +53,7 @@ export const linkGmailAccount = async () => {
             photo: user.photo || '',
             accessToken: tokens.accessToken,
             idToken: tokens.idToken,
-            linkedAt: firestore.FieldValue.serverTimestamp(),
+            linkedAt: new Date().toISOString(),
         };
 
         // Save to Firestore
@@ -76,9 +76,10 @@ export const linkGmailAccount = async () => {
             return { success: false, error: 'Maximum 3 Gmail accounts can be linked' };
         }
 
-        // Add new account
+        // Add new account - use spread to avoid arrayUnion issues with nested objects
+        const updatedAccounts = [...existingAccounts, gmailAccount];
         await firestore().collection('users').doc(currentUser.uid).update({
-            linkedGmailAccounts: firestore.FieldValue.arrayUnion(gmailAccount),
+            linkedGmailAccounts: updatedAccounts,
             updatedAt: firestore.FieldValue.serverTimestamp(),
         });
 
