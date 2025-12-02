@@ -101,6 +101,20 @@ const SettingsScreen = ({ navigation }) => {
                     </TouchableOpacity>
                 </View>
 
+                {/* Email Accounts Section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>EMAIL ACCOUNTS</Text>
+
+                    <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={() => navigation.navigate('LinkedGmailAccounts')}
+                    >
+                        <Text style={styles.menuIcon}>📧</Text>
+                        <Text style={styles.menuText}>Linked Gmail Accounts</Text>
+                        <Text style={styles.menuArrow}>›</Text>
+                    </TouchableOpacity>
+                </View>
+
                 {/* Account Section */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>ACCOUNT</Text>

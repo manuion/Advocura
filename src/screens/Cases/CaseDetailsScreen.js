@@ -12,6 +12,8 @@ import DocumentScanner from 'react-native-document-scanner-plugin';
 import RNFS from 'react-native-fs';
 import Share from 'react-native-share';
 import { jsPDF } from 'jspdf';
+import { searchEmails, getLinkedAccounts } from '../../services/gmailService';
+import { cacheEmails, getCachedEmailsForCase } from '../../services/emailCacheService';
 
 const CaseDetailsScreen = ({ navigation, route }) => {
     const { caseId } = route.params;
@@ -35,6 +37,12 @@ const CaseDetailsScreen = ({ navigation, route }) => {
     const [showRenameModal, setShowRenameModal] = useState(false);
     const [renameFileName, setRenameFileName] = useState('');
     const [renameCallback, setRenameCallback] = useState(null);
+
+    // Emails state
+    const [emails, setEmails] = useState([]);
+    const [emailsLoading, setEmailsLoading] = useState(false);
+    const [hasLinkedAccounts, setHasLinkedAccounts] = useState(false);
+    const [emailsRefreshing, setEmailsRefreshing] = useState(false);
 
     useEffect(() => {
         loadCase();
@@ -99,6 +107,86 @@ const CaseDetailsScreen = ({ navigation, route }) => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const loadEmails = async (keyword) => {
+        if (!keyword) {
+            setEmails([]);
+            return;
+        }
+
+        setEmailsLoading(true);
+
+        try {
+            // First check linked accounts
+            const accountsResult = await getLinkedAccounts();
+            setHasLinkedAccounts(accountsResult.accounts?.length > 0);
+
+            if (!accountsResult.accounts?.length) {
+                setEmails([]);
+                setEmailsLoading(false);
+                return;
+            }
+
+            // Try to get cached emails first
+            const cachedEmails = await getCachedEmailsForCase(keyword);
+            if (cachedEmails.length > 0) {
+                setEmails(cachedEmails);
+            }
+
+            // Fetch fresh emails from Gmail
+            const result = await searchEmails(keyword, 50);
+            if (result.success && result.emails.length > 0) {
+                setEmails(result.emails);
+                // Cache the emails for offline access
+                await cacheEmails(result.emails, keyword);
+            } else if (cachedEmails.length === 0) {
+                setEmails([]);
+            }
+        } catch (error) {
+            console.error('Error loading emails:', error);
+            // Try to show cached emails on error
+            const cachedEmails = await getCachedEmailsForCase(keyword);
+            if (cachedEmails.length > 0) {
+                setEmails(cachedEmails);
+            }
+        } finally {
+            setEmailsLoading(false);
+            setEmailsRefreshing(false);
+        }
+    };
+
+    const handleRefreshEmails = async () => {
+        if (!caseData?.emailKeyword) return;
+        setEmailsRefreshing(true);
+        await loadEmails(caseData.emailKeyword);
+    };
+
+    const formatEmailDate = (dateStr) => {
+        try {
+            const date = new Date(dateStr);
+            const now = new Date();
+            const isToday = date.toDateString() === now.toDateString();
+
+            if (isToday) {
+                return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            }
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        } catch {
+            return dateStr;
+        }
+    };
+
+    const extractSenderName = (fromStr) => {
+        if (!fromStr) return 'Unknown';
+        // Extract name from "Name <email>" format
+        const match = fromStr.match(/^([^<]+)</);
+        if (match) {
+            return match[1].trim().replace(/"/g, '');
+        }
+        // Just return email without domain if no name
+        const emailMatch = fromStr.match(/([^@]+)@/);
+        return emailMatch ? emailMatch[1] : fromStr;
     };
 
     const getStatusColor = (status) => {
@@ -831,7 +919,18 @@ const CaseDetailsScreen = ({ navigation, route }) => {
                     style={[styles.tab, activeTab === 'documents' && styles.activeTab]}
                     onPress={() => setActiveTab('documents')}
                 >
-                    <Text style={[styles.tabText, activeTab === 'documents' && styles.activeTabText]}>DOCUMENTS</Text>
+                    <Text style={[styles.tabText, activeTab === 'documents' && styles.activeTabText]}>DOCS</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.tab, activeTab === 'emails' && styles.activeTab]}
+                    onPress={() => {
+                        setActiveTab('emails');
+                        if (emails.length === 0 && caseData?.emailKeyword) {
+                            loadEmails(caseData.emailKeyword);
+                        }
+                    }}
+                >
+                    <Text style={[styles.tabText, activeTab === 'emails' && styles.activeTabText]}>EMAILS</Text>
                 </TouchableOpacity>
             </View>
 
@@ -1058,6 +1157,114 @@ const CaseDetailsScreen = ({ navigation, route }) => {
                                     </TouchableOpacity>
                                 );
                             })
+                        )}
+                    </>
+                )}
+
+                {activeTab === 'emails' && (
+                    <>
+                        {/* Email Keyword Info */}
+                        {caseData?.emailKeyword ? (
+                            <View style={styles.emailKeywordInfo}>
+                                <Text style={styles.emailKeywordLabel}>Searching for:</Text>
+                                <Text style={styles.emailKeywordValue}>"{caseData.emailKeyword}"</Text>
+                                <TouchableOpacity
+                                    style={styles.refreshEmailsButton}
+                                    onPress={handleRefreshEmails}
+                                    disabled={emailsRefreshing}
+                                >
+                                    <Text style={styles.refreshEmailsText}>
+                                        {emailsRefreshing ? '⏳' : '🔄'} Refresh
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        ) : (
+                            <View style={styles.noKeywordContainer}>
+                                <Text style={styles.noKeywordIcon}>📧</Text>
+                                <Text style={styles.noKeywordText}>No Email Keyword Set</Text>
+                                <Text style={styles.noKeywordSubtext}>
+                                    Edit this case and add an email subject keyword to link emails
+                                </Text>
+                                <TouchableOpacity
+                                    style={styles.setKeywordButton}
+                                    onPress={handleEdit}
+                                >
+                                    <Text style={styles.setKeywordButtonText}>Edit Case</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+
+                        {/* No Linked Accounts */}
+                        {caseData?.emailKeyword && !hasLinkedAccounts && !emailsLoading && (
+                            <View style={styles.noAccountsContainer}>
+                                <Text style={styles.noAccountsIcon}>🔗</Text>
+                                <Text style={styles.noAccountsText}>No Gmail Accounts Linked</Text>
+                                <Text style={styles.noAccountsSubtext}>
+                                    Link your Gmail account in Settings to view case-related emails
+                                </Text>
+                                <TouchableOpacity
+                                    style={styles.linkAccountButton}
+                                    onPress={() => navigation.getParent().navigate('More', { screen: 'LinkedGmailAccounts' })}
+                                >
+                                    <Text style={styles.linkAccountButtonText}>Link Gmail Account</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+
+                        {/* Loading State */}
+                        {emailsLoading && (
+                            <View style={styles.emailsLoadingContainer}>
+                                <ActivityIndicator size="large" color="#CD7F32" />
+                                <Text style={styles.emailsLoadingText}>Loading emails...</Text>
+                            </View>
+                        )}
+
+                        {/* Emails List */}
+                        {!emailsLoading && hasLinkedAccounts && caseData?.emailKeyword && (
+                            <>
+                                {emails.length === 0 ? (
+                                    <View style={styles.emptyState}>
+                                        <Text style={styles.emptyEmailIcon}>📭</Text>
+                                        <Text style={styles.emptyText}>No emails found</Text>
+                                        <Text style={styles.emptySubtext}>
+                                            No emails with "{caseData.emailKeyword}" in the subject
+                                        </Text>
+                                    </View>
+                                ) : (
+                                    emails.map((email) => (
+                                        <TouchableOpacity
+                                            key={email.id}
+                                            style={[styles.emailCard, email.isUnread && styles.emailCardUnread]}
+                                            onPress={() => navigation.navigate('EmailViewer', { email, caseData })}
+                                        >
+                                            <View style={styles.emailHeader}>
+                                                <View style={styles.emailSenderAvatar}>
+                                                    <Text style={styles.emailSenderInitial}>
+                                                        {extractSenderName(email.from).charAt(0).toUpperCase()}
+                                                    </Text>
+                                                </View>
+                                                <View style={styles.emailHeaderInfo}>
+                                                    <View style={styles.emailTopRow}>
+                                                        <Text style={[styles.emailSender, email.isUnread && styles.emailTextUnread]} numberOfLines={1}>
+                                                            {extractSenderName(email.from)}
+                                                        </Text>
+                                                        <Text style={styles.emailDate}>{formatEmailDate(email.date)}</Text>
+                                                    </View>
+                                                    <Text style={[styles.emailSubject, email.isUnread && styles.emailTextUnread]} numberOfLines={1}>
+                                                        {email.subject}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                            <Text style={styles.emailSnippet} numberOfLines={2}>
+                                                {email.snippet}
+                                            </Text>
+                                            <View style={styles.emailAccountBadge}>
+                                                <Text style={styles.emailAccountText}>{email.accountEmail}</Text>
+                                            </View>
+                                        </TouchableOpacity>
+                                    ))
+                                )}
+                            </>
                         )}
                     </>
                 )}
@@ -1545,6 +1752,204 @@ const styles = StyleSheet.create({
         color: '#121212',
         fontSize: 16,
         fontWeight: 'bold',
+    },
+    // Email styles
+    emailKeywordInfo: {
+        backgroundColor: '#1E1E1E',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#333',
+    },
+    emailKeywordLabel: {
+        color: '#999',
+        fontSize: 14,
+        marginRight: 8,
+    },
+    emailKeywordValue: {
+        color: '#CD7F32',
+        fontSize: 14,
+        fontWeight: '600',
+        flex: 1,
+    },
+    refreshEmailsButton: {
+        backgroundColor: '#2A2A2A',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+    },
+    refreshEmailsText: {
+        color: '#CD7F32',
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    noKeywordContainer: {
+        backgroundColor: '#1E1E1E',
+        borderRadius: 12,
+        padding: 32,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#333',
+    },
+    noKeywordIcon: {
+        fontSize: 48,
+        marginBottom: 16,
+    },
+    noKeywordText: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 8,
+    },
+    noKeywordSubtext: {
+        color: '#999',
+        fontSize: 14,
+        textAlign: 'center',
+        marginBottom: 20,
+    },
+    setKeywordButton: {
+        backgroundColor: '#CD7F32',
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 8,
+    },
+    setKeywordButtonText: {
+        color: '#121212',
+        fontSize: 14,
+        fontWeight: 'bold',
+    },
+    noAccountsContainer: {
+        backgroundColor: '#1E1E1E',
+        borderRadius: 12,
+        padding: 32,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#333',
+        marginTop: 16,
+    },
+    noAccountsIcon: {
+        fontSize: 48,
+        marginBottom: 16,
+    },
+    noAccountsText: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 8,
+    },
+    noAccountsSubtext: {
+        color: '#999',
+        fontSize: 14,
+        textAlign: 'center',
+        marginBottom: 20,
+    },
+    linkAccountButton: {
+        backgroundColor: '#CD7F32',
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 8,
+    },
+    linkAccountButtonText: {
+        color: '#121212',
+        fontSize: 14,
+        fontWeight: 'bold',
+    },
+    emailsLoadingContainer: {
+        padding: 40,
+        alignItems: 'center',
+    },
+    emailsLoadingText: {
+        color: '#999',
+        fontSize: 14,
+        marginTop: 12,
+    },
+    emailCard: {
+        backgroundColor: '#1E1E1E',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#333',
+    },
+    emailCardUnread: {
+        borderColor: '#CD7F32',
+        borderLeftWidth: 3,
+    },
+    emailHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    emailSenderAvatar: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#CD7F32',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    emailSenderInitial: {
+        color: '#121212',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    emailHeaderInfo: {
+        flex: 1,
+    },
+    emailTopRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 2,
+    },
+    emailSender: {
+        color: '#FFFFFF',
+        fontSize: 15,
+        fontWeight: '500',
+        flex: 1,
+    },
+    emailTextUnread: {
+        fontWeight: 'bold',
+    },
+    emailDate: {
+        color: '#666',
+        fontSize: 12,
+        marginLeft: 8,
+    },
+    emailSubject: {
+        color: '#FFFFFF',
+        fontSize: 14,
+    },
+    emailSnippet: {
+        color: '#999',
+        fontSize: 13,
+        lineHeight: 18,
+        marginBottom: 8,
+    },
+    emailAccountBadge: {
+        backgroundColor: '#2A2A2A',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4,
+        alignSelf: 'flex-start',
+    },
+    emailAccountText: {
+        color: '#666',
+        fontSize: 11,
+    },
+    emptyEmailIcon: {
+        fontSize: 48,
+        marginBottom: 12,
+    },
+    emptySubtext: {
+        color: '#666',
+        fontSize: 14,
+        marginTop: 8,
+        textAlign: 'center',
     },
 });
 

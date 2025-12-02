@@ -20,6 +20,7 @@ const AddCaseScreen = ({ navigation, route }) => {
     const [judgeName, setJudgeName] = useState(existingCase.judgeName || '');
     const [caseType, setCaseType] = useState(existingCase.caseType || 'Civil');
     const [status, setStatus] = useState(existingCase.status || 'Active');
+    const [emailKeyword, setEmailKeyword] = useState(existingCase.emailKeyword || '');
     const [saving, setSaving] = useState(false);
 
     // Client picker states
@@ -56,6 +57,7 @@ const AddCaseScreen = ({ navigation, route }) => {
             setJudgeName('');
             setCaseType('Civil');
             setStatus('Active');
+            setEmailKeyword('');
             setFilingDate(new Date());
             setNextHearingDate(null);
             setNextHearingTime(null);
@@ -185,6 +187,7 @@ const AddCaseScreen = ({ navigation, route }) => {
                 judgeName,
                 caseType,
                 status,
+                emailKeyword: emailKeyword.trim(),
                 filingDate: filingDate,
                 nextHearingDate: finalHearingDateTime,
             };
@@ -272,6 +275,21 @@ const AddCaseScreen = ({ navigation, route }) => {
                         numberOfLines={4}
                         textAlignVertical="top"
                     />
+                </View>
+
+                {/* Email Keyword */}
+                <View style={styles.inputGroup}>
+                    <Text style={styles.label}>EMAIL SUBJECT KEYWORD</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="e.g., Kumar Property Dispute"
+                        placeholderTextColor="#555"
+                        value={emailKeyword}
+                        onChangeText={setEmailKeyword}
+                    />
+                    <Text style={styles.inputHint}>
+                        Emails with this keyword in subject will be linked to this case
+                    </Text>
                 </View>
 
                 {/* Client Picker */}
@@ -641,6 +659,12 @@ const styles = StyleSheet.create({
     textArea: {
         height: 100,
         paddingTop: 14,
+    },
+    inputHint: {
+        color: '#666',
+        fontSize: 12,
+        marginTop: 6,
+        marginLeft: 4,
     },
     chipContainer: {
         flexDirection: 'row',

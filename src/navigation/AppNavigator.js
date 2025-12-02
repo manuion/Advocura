@@ -23,6 +23,8 @@ import ChangePasswordScreen from '../screens/Settings/ChangePasswordScreen';
 import StorageManagementScreen from '../screens/Settings/StorageManagementScreen';
 import SearchScreen from '../screens/Search/SearchScreen';
 import ReportsScreen from '../screens/Reports/ReportsScreen';
+import LinkedGmailAccountsScreen from '../screens/Settings/LinkedGmailAccountsScreen';
+import EmailViewerScreen from '../screens/Emails/EmailViewerScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -39,6 +41,7 @@ const CasesStackNavigator = () => {
             <CasesStack.Screen name="CaseDetails" component={CaseDetailsScreen} />
             <CasesStack.Screen name="AddHearing" component={AddHearingScreen} />
             <CasesStack.Screen name="DocumentViewer" component={DocumentViewerScreen} />
+            <CasesStack.Screen name="EmailViewer" component={EmailViewerScreen} />
         </CasesStack.Navigator>
     );
 };
@@ -63,6 +66,7 @@ const SettingsStackNavigator = () => {
             <SettingsStack.Screen name="ChangePassword" component={ChangePasswordScreen} />
             <SettingsStack.Screen name="StorageManagement" component={StorageManagementScreen} />
             <SettingsStack.Screen name="Reports" component={ReportsScreen} />
+            <SettingsStack.Screen name="LinkedGmailAccounts" component={LinkedGmailAccountsScreen} />
         </SettingsStack.Navigator>
     );
 };
