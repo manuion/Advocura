@@ -20,7 +20,7 @@ const GMAIL_SCOPES = [
 export const configureGoogleSignIn = () => {
     GoogleSignin.configure({
         scopes: GMAIL_SCOPES,
-        webClientId: '', // Will be set from google-services.json
+        webClientId: '416648406702-d7pp58c8crlg9pr2tb7r24r97r7jcgi1.apps.googleusercontent.com',
         offlineAccess: true, // Required for refresh tokens
         forceCodeForRefreshToken: true,
     });
