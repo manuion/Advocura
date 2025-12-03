@@ -263,7 +263,7 @@ export const searchEmails = async (subjectKeyword, maxResults = 50) => {
         }
 
         const allEmails = [];
-        const query = `subject:${subjectKeyword}`;
+        const query = `in:inbox subject:${subjectKeyword}`;
 
         for (const account of accounts) {
             try {
@@ -399,7 +399,7 @@ export const getEmailById = async (accountEmail, emailId) => {
 };
 
 // Send a reply to an email
-export const sendReply = async (accountEmail, originalEmail, replyBody) => {
+export const sendReply = async (accountEmail, originalEmail, replyBody, toAddress, ccAddress) => {
     try {
         const { accounts } = await getLinkedAccounts();
         const account = accounts.find(acc => acc.email === accountEmail);
@@ -408,24 +408,18 @@ export const sendReply = async (accountEmail, originalEmail, replyBody) => {
             return { success: false, error: 'Account not found' };
         }
 
-        // Extract email address from "Name <email>" format
-        const extractEmail = (str) => {
-            const match = str.match(/<(.+?)>/);
-            return match ? match[1] : str;
-        };
-
-        const toEmail = extractEmail(originalEmail.from);
-        const subject = originalEmail.subject.startsWith('Re:')
+        const subject = originalEmail.subject?.startsWith('Re:')
             ? originalEmail.subject
-            : `Re: ${originalEmail.subject}`;
+            : `Re: ${originalEmail.subject || ''}`;
 
         const message = createMimeMessage({
-            to: toEmail,
+            to: toAddress,
+            cc: ccAddress,
             from: accountEmail,
             subject: subject,
             body: replyBody,
-            inReplyTo: originalEmail.id,
-            references: originalEmail.id,
+            inReplyTo: originalEmail.messageId || originalEmail.id,
+            references: originalEmail.messageId || originalEmail.id,
             threadId: originalEmail.threadId,
         });
 
@@ -434,7 +428,11 @@ export const sendReply = async (accountEmail, originalEmail, replyBody) => {
             threadId: originalEmail.threadId,
         });
 
-        return { success: true, messageId: result.id };
+        if (result.id) {
+            return { success: true, messageId: result.id };
+        } else {
+            return { success: false, error: 'No message ID returned' };
+        }
     } catch (error) {
         console.error('Error sending reply:', error);
         return { success: false, error: error.message };
@@ -524,7 +522,7 @@ const decodeBase64 = (data) => {
 };
 
 // Helper: Create MIME message for sending
-const createMimeMessage = ({ to, from, subject, body, inReplyTo, references, threadId }) => {
+const createMimeMessage = ({ to, cc, from, subject, body, inReplyTo, references, threadId }) => {
     const boundary = '----=_Part_' + Date.now();
 
     let message = [
@@ -534,6 +532,10 @@ const createMimeMessage = ({ to, from, subject, body, inReplyTo, references, thr
         'MIME-Version: 1.0',
         `Content-Type: multipart/alternative; boundary="${boundary}"`,
     ];
+
+    if (cc && cc.trim()) {
+        message.splice(2, 0, `Cc: ${cc}`);
+    }
 
     if (inReplyTo) {
         message.push(`In-Reply-To: <${inReplyTo}>`);

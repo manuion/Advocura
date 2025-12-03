@@ -25,6 +25,7 @@ import SearchScreen from '../screens/Search/SearchScreen';
 import ReportsScreen from '../screens/Reports/ReportsScreen';
 import LinkedGmailAccountsScreen from '../screens/Settings/LinkedGmailAccountsScreen';
 import EmailViewerScreen from '../screens/Emails/EmailViewerScreen';
+import ComposeEmailScreen from '../screens/Emails/ComposeEmailScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -42,6 +43,7 @@ const CasesStackNavigator = () => {
             <CasesStack.Screen name="AddHearing" component={AddHearingScreen} />
             <CasesStack.Screen name="DocumentViewer" component={DocumentViewerScreen} />
             <CasesStack.Screen name="EmailViewer" component={EmailViewerScreen} />
+            <CasesStack.Screen name="ComposeEmail" component={ComposeEmailScreen} />
         </CasesStack.Navigator>
     );
 };
