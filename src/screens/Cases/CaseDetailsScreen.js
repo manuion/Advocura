@@ -40,6 +40,7 @@ const CaseDetailsScreen = ({ navigation, route }) => {
 
     // Emails state
     const [emails, setEmails] = useState([]);
+    const [emailThreads, setEmailThreads] = useState([]); // Grouped by thread
     const [emailsLoading, setEmailsLoading] = useState(false);
     const [hasLinkedAccounts, setHasLinkedAccounts] = useState(false);
     const [emailsRefreshing, setEmailsRefreshing] = useState(false);
@@ -109,9 +110,46 @@ const CaseDetailsScreen = ({ navigation, route }) => {
         }
     };
 
+    // Group emails by threadId
+    const groupEmailsByThread = (emailList) => {
+        const threadMap = {};
+
+        for (const email of emailList) {
+            const threadId = email.threadId;
+            if (!threadMap[threadId]) {
+                threadMap[threadId] = {
+                    threadId,
+                    emails: [],
+                    latestEmail: email,
+                    subject: email.subject,
+                    accountEmail: email.accountEmail,
+                    hasUnread: false,
+                };
+            }
+            threadMap[threadId].emails.push(email);
+
+            // Track if thread has unread emails
+            if (email.isUnread) {
+                threadMap[threadId].hasUnread = true;
+            }
+
+            // Update latest email (most recent by date)
+            if (new Date(email.date) > new Date(threadMap[threadId].latestEmail.date)) {
+                threadMap[threadId].latestEmail = email;
+            }
+        }
+
+        // Convert to array and sort by latest email date (newest first)
+        const threads = Object.values(threadMap);
+        threads.sort((a, b) => new Date(b.latestEmail.date) - new Date(a.latestEmail.date));
+
+        return threads;
+    };
+
     const loadEmails = async (keyword) => {
         if (!keyword) {
             setEmails([]);
+            setEmailThreads([]);
             return;
         }
 
@@ -124,6 +162,7 @@ const CaseDetailsScreen = ({ navigation, route }) => {
 
             if (!accountsResult.accounts?.length) {
                 setEmails([]);
+                setEmailThreads([]);
                 setEmailsLoading(false);
                 return;
             }
@@ -132,16 +171,19 @@ const CaseDetailsScreen = ({ navigation, route }) => {
             const cachedEmails = await getCachedEmailsForCase(keyword);
             if (cachedEmails.length > 0) {
                 setEmails(cachedEmails);
+                setEmailThreads(groupEmailsByThread(cachedEmails));
             }
 
             // Fetch fresh emails from Gmail
             const result = await searchEmails(keyword, 50);
             if (result.success && result.emails.length > 0) {
                 setEmails(result.emails);
+                setEmailThreads(groupEmailsByThread(result.emails));
                 // Cache the emails for offline access
                 await cacheEmails(result.emails, keyword);
             } else if (cachedEmails.length === 0) {
                 setEmails([]);
+                setEmailThreads([]);
             }
         } catch (error) {
             console.error('Error loading emails:', error);
@@ -149,6 +191,7 @@ const CaseDetailsScreen = ({ navigation, route }) => {
             const cachedEmails = await getCachedEmailsForCase(keyword);
             if (cachedEmails.length > 0) {
                 setEmails(cachedEmails);
+                setEmailThreads(groupEmailsByThread(cachedEmails));
             }
         } finally {
             setEmailsLoading(false);
@@ -1219,10 +1262,10 @@ const CaseDetailsScreen = ({ navigation, route }) => {
                             </View>
                         )}
 
-                        {/* Emails List */}
+                        {/* Email Threads List */}
                         {!emailsLoading && hasLinkedAccounts && caseData?.emailKeyword && (
                             <>
-                                {emails.length === 0 ? (
+                                {emailThreads.length === 0 ? (
                                     <View style={styles.emptyState}>
                                         <Text style={styles.emptyEmailIcon}>📭</Text>
                                         <Text style={styles.emptyText}>No emails found</Text>
@@ -1231,38 +1274,62 @@ const CaseDetailsScreen = ({ navigation, route }) => {
                                         </Text>
                                     </View>
                                 ) : (
-                                    emails.map((email) => (
-                                        <TouchableOpacity
-                                            key={email.id}
-                                            style={[styles.emailCard, email.isUnread && styles.emailCardUnread]}
-                                            onPress={() => navigation.navigate('EmailViewer', { email, caseData })}
-                                        >
-                                            <View style={styles.emailHeader}>
-                                                <View style={styles.emailSenderAvatar}>
-                                                    <Text style={styles.emailSenderInitial}>
-                                                        {extractSenderName(email.from).charAt(0).toUpperCase()}
-                                                    </Text>
-                                                </View>
-                                                <View style={styles.emailHeaderInfo}>
-                                                    <View style={styles.emailTopRow}>
-                                                        <Text style={[styles.emailSender, email.isUnread && styles.emailTextUnread]} numberOfLines={1}>
-                                                            {extractSenderName(email.from)}
+                                    emailThreads.map((thread) => {
+                                        const latestEmail = thread.latestEmail;
+                                        const messageCount = thread.emails.length;
+                                        const hasMultiple = messageCount > 1;
+
+                                        return (
+                                            <TouchableOpacity
+                                                key={thread.threadId}
+                                                style={[styles.emailCard, thread.hasUnread && styles.emailCardUnread]}
+                                                onPress={() => {
+                                                    if (hasMultiple) {
+                                                        navigation.navigate('EmailThread', { thread, caseData });
+                                                    } else {
+                                                        navigation.navigate('EmailViewer', { email: latestEmail, caseData });
+                                                    }
+                                                }}
+                                            >
+                                                <View style={styles.emailHeader}>
+                                                    <View style={styles.emailSenderAvatar}>
+                                                        <Text style={styles.emailSenderInitial}>
+                                                            {extractSenderName(latestEmail.from).charAt(0).toUpperCase()}
                                                         </Text>
-                                                        <Text style={styles.emailDate}>{formatEmailDate(email.date)}</Text>
                                                     </View>
-                                                    <Text style={[styles.emailSubject, email.isUnread && styles.emailTextUnread]} numberOfLines={1}>
-                                                        {email.subject}
-                                                    </Text>
+                                                    <View style={styles.emailHeaderInfo}>
+                                                        <View style={styles.emailTopRow}>
+                                                            <Text style={[styles.emailSender, thread.hasUnread && styles.emailTextUnread]} numberOfLines={1}>
+                                                                {extractSenderName(latestEmail.from)}
+                                                            </Text>
+                                                            <View style={styles.emailDateRow}>
+                                                                {hasMultiple && (
+                                                                    <View style={styles.threadCountBadge}>
+                                                                        <Text style={styles.threadCountText}>{messageCount}</Text>
+                                                                    </View>
+                                                                )}
+                                                                <Text style={styles.emailDate}>{formatEmailDate(latestEmail.date)}</Text>
+                                                            </View>
+                                                        </View>
+                                                        <Text style={[styles.emailSubject, thread.hasUnread && styles.emailTextUnread]} numberOfLines={1}>
+                                                            {thread.subject}
+                                                        </Text>
+                                                    </View>
                                                 </View>
-                                            </View>
-                                            <Text style={styles.emailSnippet} numberOfLines={2}>
-                                                {email.snippet}
-                                            </Text>
-                                            <View style={styles.emailAccountBadge}>
-                                                <Text style={styles.emailAccountText}>{email.accountEmail}</Text>
-                                            </View>
-                                        </TouchableOpacity>
-                                    ))
+                                                <Text style={styles.emailSnippet} numberOfLines={2}>
+                                                    {latestEmail.snippet}
+                                                </Text>
+                                                <View style={styles.emailFooter}>
+                                                    <View style={styles.emailAccountBadge}>
+                                                        <Text style={styles.emailAccountText}>{latestEmail.accountEmail}</Text>
+                                                    </View>
+                                                    {hasMultiple && (
+                                                        <Text style={styles.threadHint}>Tap to view thread →</Text>
+                                                    )}
+                                                </View>
+                                            </TouchableOpacity>
+                                        );
+                                    })
                                 )}
                             </>
                         )}
@@ -1950,6 +2017,36 @@ const styles = StyleSheet.create({
         fontSize: 14,
         marginTop: 8,
         textAlign: 'center',
+    },
+    // Thread styles
+    emailDateRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    threadCountBadge: {
+        backgroundColor: '#CD7F32',
+        borderRadius: 10,
+        minWidth: 20,
+        height: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 6,
+        paddingHorizontal: 6,
+    },
+    threadCountText: {
+        color: '#121212',
+        fontSize: 11,
+        fontWeight: 'bold',
+    },
+    emailFooter: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    threadHint: {
+        color: '#CD7F32',
+        fontSize: 11,
+        fontWeight: '500',
     },
 });
 

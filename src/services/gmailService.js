@@ -647,6 +647,51 @@ const stripHtml = (html) => {
         .trim();
 };
 
+// Get all emails in a thread
+export const getThreadEmails = async (accountEmail, threadId) => {
+    try {
+        const { accounts } = await getLinkedAccounts();
+        const account = accounts.find(acc => acc.email === accountEmail);
+
+        if (!account) {
+            return { success: false, error: 'Account not found', emails: [] };
+        }
+
+        // Get thread with full message details
+        const threadResult = await gmailApiRequest(account, `/threads/${threadId}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Date`);
+
+        if (!threadResult.messages || threadResult.messages.length === 0) {
+            return { success: true, emails: [] };
+        }
+
+        const emails = threadResult.messages.map(msg => {
+            const headers = msg.payload?.headers || [];
+            const getHeader = (name) => headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || '';
+
+            return {
+                id: msg.id,
+                threadId: msg.threadId,
+                accountEmail: accountEmail,
+                subject: getHeader('Subject'),
+                from: getHeader('From'),
+                to: getHeader('To'),
+                date: getHeader('Date'),
+                snippet: msg.snippet,
+                labelIds: msg.labelIds,
+                isUnread: msg.labelIds?.includes('UNREAD'),
+            };
+        });
+
+        // Sort by date (oldest first for thread view)
+        emails.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        return { success: true, emails };
+    } catch (error) {
+        console.error('Error getting thread emails:', error);
+        return { success: false, error: error.message, emails: [] };
+    }
+};
+
 // Mark email as read
 export const markAsRead = async (accountEmail, emailId) => {
     try {

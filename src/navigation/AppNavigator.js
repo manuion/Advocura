@@ -26,6 +26,7 @@ import ReportsScreen from '../screens/Reports/ReportsScreen';
 import LinkedGmailAccountsScreen from '../screens/Settings/LinkedGmailAccountsScreen';
 import EmailViewerScreen from '../screens/Emails/EmailViewerScreen';
 import ComposeEmailScreen from '../screens/Emails/ComposeEmailScreen';
+import EmailThreadScreen from '../screens/Emails/EmailThreadScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -44,6 +45,7 @@ const CasesStackNavigator = () => {
             <CasesStack.Screen name="DocumentViewer" component={DocumentViewerScreen} />
             <CasesStack.Screen name="EmailViewer" component={EmailViewerScreen} />
             <CasesStack.Screen name="ComposeEmail" component={ComposeEmailScreen} />
+            <CasesStack.Screen name="EmailThread" component={EmailThreadScreen} />
         </CasesStack.Navigator>
     );
 };

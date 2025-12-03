@@ -17,6 +17,10 @@ import {
     removeCachedDocument,
     clearCache,
 } from '../../services/documentCacheService';
+import {
+    getEmailCacheStats,
+    clearEmailCache,
+} from '../../services/emailCacheService';
 import { formatFileSize, formatRelativeTime } from '../../utils/fileUtils';
 import { getCurrentUser } from '../../services/authService';
 
@@ -24,8 +28,10 @@ const StorageManagementScreen = ({ navigation }) => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [stats, setStats] = useState(null);
+    const [emailStats, setEmailStats] = useState(null);
     const [documents, setDocuments] = useState([]);
     const [deleting, setDeleting] = useState({});
+    const [activeTab, setActiveTab] = useState('documents'); // 'documents' or 'emails'
 
     useEffect(() => {
         loadStorageData();
@@ -33,9 +39,13 @@ const StorageManagementScreen = ({ navigation }) => {
 
     const loadStorageData = async () => {
         try {
-            // Get cache statistics
+            // Get document cache statistics
             const cacheStats = await getCacheStats();
             setStats(cacheStats);
+
+            // Get email cache statistics
+            const emailCacheStats = await getEmailCacheStats();
+            setEmailStats(emailCacheStats);
 
             // Get list of cached documents
             const cachedDocs = await getCachedDocumentsList();
@@ -109,6 +119,33 @@ const StorageManagementScreen = ({ navigation }) => {
         );
     };
 
+    const handleClearEmailCache = () => {
+        Alert.alert(
+            'Clear Email Cache',
+            `This will remove all ${emailStats?.emailCount || 0} cached emails (${formatFileSize(emailStats?.totalSize || 0)}). Emails will be fetched again when you view them.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Clear All',
+                    style: 'destructive',
+                    onPress: async () => {
+                        setLoading(true);
+                        try {
+                            await clearEmailCache();
+                            await loadStorageData(); // Refresh data
+                            Toast.show({ type: 'success', text1: 'Success', text2: 'Email cache cleared' });
+                        } catch (error) {
+                            console.error('[StorageManagement] Clear email cache error:', error);
+                            Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to clear email cache' });
+                        } finally {
+                            setLoading(false);
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
     const getStorageColor = (percentUsed) => {
         if (percentUsed >= 90) return '#FF5252'; // Red
         if (percentUsed >= 75) return '#FFA726'; // Orange
@@ -123,7 +160,7 @@ const StorageManagementScreen = ({ navigation }) => {
 
         return (
             <View style={styles.gaugeContainer}>
-                <Text style={styles.gaugeTitle}>Storage Usage</Text>
+                <Text style={styles.gaugeTitle}>📁 Document Cache</Text>
 
                 {/* Progress Bar */}
                 <View style={styles.progressBarContainer}>
@@ -161,6 +198,58 @@ const StorageManagementScreen = ({ navigation }) => {
                             💾 Compression saved {formatFileSize(stats.compressionSavings)}
                         </Text>
                     </View>
+                )}
+            </View>
+        );
+    };
+
+    const renderEmailCacheGauge = () => {
+        if (!emailStats) return null;
+
+        const percentUsed = emailStats.percentUsed || 0;
+        const color = getStorageColor(percentUsed);
+
+        return (
+            <View style={styles.gaugeContainer}>
+                <Text style={styles.gaugeTitle}>📧 Email Cache</Text>
+
+                {/* Progress Bar */}
+                <View style={styles.progressBarContainer}>
+                    <View
+                        style={[
+                            styles.progressBarFill,
+                            { width: `${Math.min(percentUsed, 100)}%`, backgroundColor: color },
+                        ]}
+                    />
+                </View>
+
+                {/* Stats */}
+                <View style={styles.statsRow}>
+                    <Text style={styles.statsText}>
+                        {formatFileSize(emailStats.totalSize)} / {emailStats.maxSizeMB} MB
+                    </Text>
+                    <Text style={[styles.statsPercentage, { color }]}>
+                        {percentUsed.toFixed(1)}%
+                    </Text>
+                </View>
+
+                <View style={styles.statsRow}>
+                    <Text style={styles.statsSubtext}>
+                        {emailStats.emailCount} {emailStats.emailCount === 1 ? 'email' : 'emails'} cached
+                    </Text>
+                    <Text style={styles.statsSubtext}>
+                        {formatFileSize((emailStats.maxSizeMB * 1024 * 1024) - emailStats.totalSize)} available
+                    </Text>
+                </View>
+
+                {/* Clear Button */}
+                {emailStats.emailCount > 0 && (
+                    <TouchableOpacity
+                        style={styles.clearCacheButton}
+                        onPress={handleClearEmailCache}
+                    >
+                        <Text style={styles.clearCacheButtonText}>Clear Email Cache</Text>
+                    </TouchableOpacity>
                 )}
             </View>
         );
@@ -243,16 +332,19 @@ const StorageManagementScreen = ({ navigation }) => {
                 <View style={{ width: 50 }} />
             </View>
 
-            {/* Storage Gauge */}
+            {/* Document Cache Gauge */}
             {renderStorageGauge()}
 
-            {/* Clear All Button */}
+            {/* Email Cache Gauge */}
+            {renderEmailCacheGauge()}
+
+            {/* Clear All Documents Button */}
             {documents.length > 0 && (
                 <TouchableOpacity
                     style={styles.clearAllButton}
                     onPress={handleClearAll}
                 >
-                    <Text style={styles.clearAllButtonText}>Clear All Cache</Text>
+                    <Text style={styles.clearAllButtonText}>Clear All Document Cache</Text>
                 </TouchableOpacity>
             )}
 
@@ -315,7 +407,9 @@ const styles = StyleSheet.create({
     },
     gaugeContainer: {
         backgroundColor: '#1E1E1E',
-        margin: 16,
+        marginHorizontal: 16,
+        marginTop: 16,
+        marginBottom: 8,
         padding: 20,
         borderRadius: 12,
     },
@@ -364,6 +458,18 @@ const styles = StyleSheet.create({
     compressionText: {
         color: '#4CAF50',
         fontSize: 12,
+        fontWeight: '600',
+    },
+    clearCacheButton: {
+        backgroundColor: '#FF5252',
+        marginTop: 12,
+        padding: 10,
+        borderRadius: 6,
+        alignItems: 'center',
+    },
+    clearCacheButtonText: {
+        color: '#FFFFFF',
+        fontSize: 13,
         fontWeight: '600',
     },
     clearAllButton: {
