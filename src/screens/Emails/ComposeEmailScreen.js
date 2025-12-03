@@ -82,7 +82,8 @@ const ComposeEmailScreen = ({ navigation, route }) => {
                     originalEmail.accountEmail,
                     originalEmail,
                     to,
-                    body
+                    body,
+                    cc
                 );
             }
 

@@ -440,7 +440,7 @@ export const sendReply = async (accountEmail, originalEmail, replyBody, toAddres
 };
 
 // Forward an email
-export const forwardEmail = async (accountEmail, originalEmail, toAddress, forwardBody) => {
+export const forwardEmail = async (accountEmail, originalEmail, toAddress, forwardBody, ccAddress, attachments = []) => {
     try {
         const { accounts } = await getLinkedAccounts();
         const account = accounts.find(acc => acc.email === accountEmail);
@@ -449,25 +449,51 @@ export const forwardEmail = async (accountEmail, originalEmail, toAddress, forwa
             return { success: false, error: 'Account not found' };
         }
 
-        const subject = originalEmail.subject.startsWith('Fwd:')
+        const subject = originalEmail.subject?.startsWith('Fwd:')
             ? originalEmail.subject
-            : `Fwd: ${originalEmail.subject}`;
+            : `Fwd: ${originalEmail.subject || ''}`;
 
         // Include original email in forward body
-        const fullBody = `${forwardBody}\n\n---------- Forwarded message ----------\nFrom: ${originalEmail.from}\nDate: ${originalEmail.date}\nSubject: ${originalEmail.subject}\nTo: ${originalEmail.to}\n\n${originalEmail.body || originalEmail.htmlBody}`;
+        const fullBody = `${forwardBody}\n\n---------- Forwarded message ----------\nFrom: ${originalEmail.from}\nDate: ${originalEmail.date}\nSubject: ${originalEmail.subject}\nTo: ${originalEmail.to}\n\n${originalEmail.body || originalEmail.htmlBody || ''}`;
+
+        // If there are attachments, download them and include in the forward
+        let attachmentData = [];
+        if (originalEmail.attachments && originalEmail.attachments.length > 0) {
+            for (const att of originalEmail.attachments) {
+                try {
+                    // att.id contains the attachmentId
+                    const attResult = await downloadAttachment(accountEmail, originalEmail.id, att.id);
+                    if (attResult.success && attResult.data) {
+                        attachmentData.push({
+                            filename: att.filename,
+                            mimeType: att.mimeType,
+                            data: attResult.data,
+                        });
+                    }
+                } catch (attError) {
+                    console.error('Error downloading attachment for forward:', attError);
+                }
+            }
+        }
 
         const message = createMimeMessage({
             to: toAddress,
+            cc: ccAddress,
             from: accountEmail,
             subject: subject,
             body: fullBody,
+            attachments: attachmentData,
         });
 
         const result = await gmailApiRequest(account, '/messages/send', 'POST', {
             raw: message,
         });
 
-        return { success: true, messageId: result.id };
+        if (result.id) {
+            return { success: true, messageId: result.id };
+        } else {
+            return { success: false, error: 'No message ID returned' };
+        }
     } catch (error) {
         console.error('Error forwarding email:', error);
         return { success: false, error: error.message };
@@ -522,15 +548,15 @@ const decodeBase64 = (data) => {
 };
 
 // Helper: Create MIME message for sending
-const createMimeMessage = ({ to, cc, from, subject, body, inReplyTo, references, threadId }) => {
+const createMimeMessage = ({ to, cc, from, subject, body, inReplyTo, references, threadId, attachments = [] }) => {
     const boundary = '----=_Part_' + Date.now();
+    const hasAttachments = attachments && attachments.length > 0;
 
     let message = [
         `To: ${to}`,
         `From: ${from}`,
         `Subject: ${subject}`,
         'MIME-Version: 1.0',
-        `Content-Type: multipart/alternative; boundary="${boundary}"`,
     ];
 
     if (cc && cc.trim()) {
@@ -544,18 +570,59 @@ const createMimeMessage = ({ to, cc, from, subject, body, inReplyTo, references,
         message.push(`References: <${references}>`);
     }
 
-    message.push('');
-    message.push(`--${boundary}`);
-    message.push('Content-Type: text/plain; charset=UTF-8');
-    message.push('');
-    message.push(stripHtml(body));
-    message.push('');
-    message.push(`--${boundary}`);
-    message.push('Content-Type: text/html; charset=UTF-8');
-    message.push('');
-    message.push(body);
-    message.push('');
-    message.push(`--${boundary}--`);
+    if (hasAttachments) {
+        // Mixed content type for body + attachments
+        message.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
+        message.push('');
+
+        // Text/HTML body part
+        const altBoundary = '----=_Alt_' + Date.now();
+        message.push(`--${boundary}`);
+        message.push(`Content-Type: multipart/alternative; boundary="${altBoundary}"`);
+        message.push('');
+
+        message.push(`--${altBoundary}`);
+        message.push('Content-Type: text/plain; charset=UTF-8');
+        message.push('');
+        message.push(stripHtml(body));
+        message.push('');
+
+        message.push(`--${altBoundary}`);
+        message.push('Content-Type: text/html; charset=UTF-8');
+        message.push('');
+        message.push(body);
+        message.push('');
+        message.push(`--${altBoundary}--`);
+
+        // Attachments
+        for (const att of attachments) {
+            message.push('');
+            message.push(`--${boundary}`);
+            message.push(`Content-Type: ${att.mimeType}; name="${att.filename}"`);
+            message.push('Content-Transfer-Encoding: base64');
+            message.push(`Content-Disposition: attachment; filename="${att.filename}"`);
+            message.push('');
+            message.push(att.data);
+        }
+
+        message.push('');
+        message.push(`--${boundary}--`);
+    } else {
+        // No attachments - simple alternative content
+        message.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
+        message.push('');
+        message.push(`--${boundary}`);
+        message.push('Content-Type: text/plain; charset=UTF-8');
+        message.push('');
+        message.push(stripHtml(body));
+        message.push('');
+        message.push(`--${boundary}`);
+        message.push('Content-Type: text/html; charset=UTF-8');
+        message.push('');
+        message.push(body);
+        message.push('');
+        message.push(`--${boundary}--`);
+    }
 
     const rawMessage = message.join('\r\n');
 
