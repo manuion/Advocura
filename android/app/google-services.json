@@ -12,7 +12,20 @@
           "package_name": "com.mk.ac"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "416648406702-3av6e3iia058ob1j2nl1s6ip43ndg0bf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.mk.ac",
+            "certificate_hash": "77e0fe5584833d62621afd2dda01c60f17be3e16"
+          }
+        },
+        {
+          "client_id": "416648406702-d7pp58c8crlg9pr2tb7r24r97r7jcgi1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCZILeIOJOA0z-GwI53Fz731JV_y6YutTk"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "416648406702-d7pp58c8crlg9pr2tb7r24r97r7jcgi1.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
