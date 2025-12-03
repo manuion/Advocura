@@ -158,23 +158,34 @@ export const getLinkedAccounts = async () => {
     }
 };
 
-// Refresh access token for an account
+// Refresh access token for an account (silent refresh)
 const refreshAccessToken = async (account) => {
     try {
-        // Check if current Google user matches
-        const currentGoogleUser = await GoogleSignin.getCurrentUser();
+        console.log('[Gmail] Refreshing token for:', account.email);
 
-        if (!currentGoogleUser || currentGoogleUser.user.email !== account.email) {
-            // Need to sign in as this user
+        // Try silent sign-in first
+        try {
+            const currentGoogleUser = await GoogleSignin.getCurrentUser();
+
+            // If no current user or different user, try silent sign in
+            if (!currentGoogleUser || currentGoogleUser?.user?.email !== account.email) {
+                console.log('[Gmail] Attempting silent sign in...');
+                await GoogleSignin.signOut();
+                await GoogleSignin.signInSilently();
+            }
+        } catch (silentError) {
+            console.log('[Gmail] Silent sign-in failed, trying regular sign-in');
+            // Silent sign-in failed, need interactive sign-in
             await GoogleSignin.signOut();
             await GoogleSignin.signIn();
         }
 
         const tokens = await GoogleSignin.getTokens();
+        console.log('[Gmail] Got new token');
 
         // Update token in Firestore
         const currentUser = auth().currentUser;
-        if (currentUser) {
+        if (currentUser && tokens.accessToken) {
             const userDoc = await firestore().collection('users').doc(currentUser.uid).get();
             const accounts = userDoc.data()?.linkedGmailAccounts || [];
 
@@ -188,11 +199,13 @@ const refreshAccessToken = async (account) => {
             await firestore().collection('users').doc(currentUser.uid).update({
                 linkedGmailAccounts: updatedAccounts,
             });
+
+            console.log('[Gmail] Token updated in Firestore');
         }
 
         return tokens.accessToken;
     } catch (error) {
-        console.error('Error refreshing token:', error);
+        console.error('[Gmail] Error refreshing token:', error);
         throw error;
     }
 };
@@ -220,10 +233,16 @@ const gmailApiRequest = async (account, endpoint, method = 'GET', body = null) =
 
     let response = await makeRequest(accessToken);
 
-    // If token expired, refresh and retry
-    if (response.status === 401) {
-        accessToken = await refreshAccessToken(account);
-        response = await makeRequest(accessToken);
+    // If token expired or invalid, refresh and retry
+    if (response.status === 401 || response.status === 403) {
+        console.log('[Gmail] Token expired/invalid, refreshing...');
+        try {
+            accessToken = await refreshAccessToken(account);
+            response = await makeRequest(accessToken);
+        } catch (refreshError) {
+            console.error('[Gmail] Token refresh failed:', refreshError);
+            throw new Error('Gmail authentication expired. Please re-link your account in Settings.');
+        }
     }
 
     if (!response.ok) {
